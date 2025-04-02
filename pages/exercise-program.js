@@ -110,106 +110,6 @@ function useMetronome() {
   return { isPlaying, togglePlay };
 }
 
-// Function to get recommended exercises
-function getRecommendedExercises(selectedRegions) {
-  const allExercises = [];
-  const exerciseSet = new Set(); // Use a Set to track unique exercise IDs
-
-  // Collect exercises from each selected pain region
-  selectedRegions.forEach((regionId) => {
-    if (exerciseLibrary[regionId]) {
-      exerciseLibrary[regionId].forEach((exercise) => {
-        const exerciseKey = exercise.id; // Use only the exercise ID for deduplication
-        if (!exerciseSet.has(exerciseKey)) {
-          exerciseSet.add(exerciseKey); // Add the exercise ID to the Set
-          allExercises.push({
-            ...exercise,
-            painRegion: regionId, // Keep the pain region for reference
-          });
-        }
-      });
-    }
-  });
-
-  // Ensure we have a good mix by separating the exercises by type
-  const stretches = allExercises.filter((ex) => ex.category === 'stretches');
-  const strength = allExercises.filter((ex) => ex.category === 'strength');
-  const isometrics = allExercises.filter((ex) => ex.category === 'isometrics');
-
-  // Separate free and premium exercises
-  const freeStretches = stretches.filter((ex) => ex.isFree);
-  const freeStrength = strength.filter((ex) => ex.isFree);
-  const freeIsometrics = isometrics.filter((ex) => ex.isFree);
-
-  const premiumExercises = allExercises.filter((ex) => !ex.isFree);
-
-  // Create a balanced set of exercises
-  const selectedExercises = [];
-
-  // First, ensure we have 2 free exercises for all users
-  if (freeStretches.length > 0) {
-    selectedExercises.push(freeStretches[0]);
-  }
-
-  if (freeStrength.length > 0) {
-    selectedExercises.push(freeStrength[0]);
-  }
-
-  if (selectedExercises.length < 2 && freeIsometrics.length > 0) {
-    selectedExercises.push(freeIsometrics[0]);
-  }
-
-  const allFreeExercises = allExercises.filter((ex) => ex.isFree);
-  while (selectedExercises.length < 2 && allFreeExercises.length > 0) {
-    const remainingFree = allFreeExercises.filter(
-      (ex) => !selectedExercises.some((selected) => selected.id === ex.id)
-    );
-    if (remainingFree.length > 0) {
-      selectedExercises.push(remainingFree[0]);
-    } else {
-      break;
-    }
-  }
-
-  // Add 2 premium exercises (or additional free ones if not enough premium)
-  if (premiumExercises.length > 0) {
-    selectedExercises.push(premiumExercises[0]);
-  } else {
-    const unusedFree = allFreeExercises.filter(
-      (ex) => !selectedExercises.some((selected) => selected.id === ex.id)
-    );
-    if (unusedFree.length > 0) {
-      selectedExercises.push(unusedFree[0]);
-    }
-  }
-
-  if (premiumExercises.length > 1) {
-    selectedExercises.push(premiumExercises[1]);
-  } else {
-    const unusedFree = allFreeExercises.filter(
-      (ex) => !selectedExercises.some((selected) => selected.id === ex.id)
-    );
-    if (unusedFree.length > 0) {
-      selectedExercises.push(unusedFree[0]);
-    }
-  }
-
-  // Ensure we have exactly 4 exercises
-  while (selectedExercises.length < 4) {
-    if (selectedExercises.length > 0) {
-      const index = selectedExercises.length % selectedExercises.length;
-      selectedExercises.push({
-        ...selectedExercises[index],
-        id: `${selectedExercises[index].id}-copy-${selectedExercises.length}`,
-      });
-    } else {
-      break;
-    }
-  }
-
-  return selectedExercises.slice(0, 4);
-}
-
 export default function ExerciseProgram() {
   const { currentUser } = useAuth();
   const router = useRouter();
@@ -274,6 +174,7 @@ export default function ExerciseProgram() {
       return;
     }
 
+
     // Fetch user's pain regions and subscription status
     async function fetchUserData() {
       try {
@@ -304,8 +205,8 @@ export default function ExerciseProgram() {
               // Add all exercises from this region, both free and premium
               exerciseLibrary[region].forEach(exercise => {
                 if (exercise.category && categorizedExercises[exercise.category] !== undefined) {
-                  // Use exercise ID as a unique identifier to avoid duplicates
-                  const exerciseKey = `${exercise.id}_${region}`;
+                  // Use ONLY exercise ID as a unique identifier to avoid duplicates
+                  const exerciseKey = exercise.id;
                   if (!exerciseSet.has(exerciseKey)) {
                     exerciseSet.add(exerciseKey);
                     categorizedExercises[exercise.category].push({
