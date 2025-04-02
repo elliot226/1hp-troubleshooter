@@ -7,6 +7,13 @@ import { getUserData } from '@/lib/firestoreUtils';
 import { hasCompletedAssessment, isProUser } from '@/lib/userUtils';
 import QuickStats from '@/components/QuickStats';
 import ProtectedPage from '@/components/layouts/ProtectedPage';
+import { 
+  exerciseLibrary, 
+  exercisesByPainRegion, 
+  getExercisesForMultiplePainRegions,
+  painRegionToTestMapping
+} from '@/lib/exerciseData';
+import { getExercisePrescription } from '@/lib/exercisePrescriptionUtils';
 
 // Pain region data with descriptions
 const painRegionData = {
@@ -52,126 +59,6 @@ const painRegionData = {
   }
 };
 
-// Exercise library from the exercise-program.js
-const exerciseLibrary = {
-  wristFlexors: [
-    { 
-      id: 'wristFlexorStretch', 
-      name: 'Wrist Flexor Stretch*',
-      category: 'stretches',
-      sets: '3 Sets of 20-30 Seconds',
-      instructions: 'With your elbow straight, use your opposite hand to bend your wrist upward until you feel a stretch on the bottom of your forearm. Hold for 20-30 seconds.',
-      imageUrl: '/images/exercises/wrist-flexor-stretch.jpg',
-      isFree: true
-    },
-    { 
-      id: 'dbWristFlexion', 
-      name: 'DB Wrist Flexion*',
-      category: 'strength',
-      instructions: 'Sit with your forearm resting on a table, palm facing up, with wrist at the edge. Hold a dumbbell and lower it down, then curl it up using only your wrist.',
-      imageUrl: '/images/exercises/db-wrist-flexion.jpg',
-      isFree: true
-    },
-    { 
-      id: 'isometricWristFlexion', 
-      name: 'Isometric Wrist Flexion*',
-      category: 'isometrics',
-      duration: '3 Sets of 45 Seconds',
-      rest: 'Rest 30 Seconds Between Sets',
-      instructions: 'Place your palm against a stable surface. Push into the surface without moving your wrist, creating tension in your flexor muscles.',
-      imageUrl: '/images/exercises/isometric-wrist-flexion.jpg',
-      isFree: true
-    },
-  ],
-  wristExtensors: [
-    { 
-      id: 'wristExtensorStretch', 
-      name: 'Wrist Extensor Stretch*',
-      category: 'stretches',
-      sets: '3 Sets of 20-30 Seconds',
-      instructions: 'With your elbow straight, use your opposite hand to bend your wrist downward until you feel a stretch on the top of your forearm. Hold for 20-30 seconds.',
-      imageUrl: '/images/exercises/wrist-extensor-stretch.jpg',
-      isFree: true
-    },
-    { 
-      id: 'isometricWristExtension', 
-      name: 'Isometric Wrist Extension*',
-      category: 'isometrics',
-      duration: '3 Sets of 45 Seconds',
-      rest: 'Rest 30 Seconds Between Sets',
-      instructions: 'Place the back of your hand against a stable surface. Push into the surface without moving your wrist, creating tension in your extensor muscles.',
-      imageUrl: '/images/exercises/isometric-wrist-extension.jpg',
-      isFree: true
-    },
-    { 
-      id: 'dbWristExtension', 
-      name: 'DB Wrist Extension*',
-      category: 'strength',
-      instructions: 'Sit with your forearm resting on a table, palm facing down, with wrist at the edge. Hold a dumbbell and lower it down, then lift it up using only your wrist.',
-      imageUrl: '/images/exercises/db-wrist-extension.jpg',
-      isFree: true
-    },
-  ],
-  thumbFlexors: [
-    { 
-      id: 'thumbFlexorStretch', 
-      name: 'Thumb Flexor Stretch*',
-      category: 'stretches',
-      sets: '3 Sets of 20-30 Seconds',
-      instructions: 'Gently pull your thumb backward with your other hand until you feel a stretch at the base of your thumb and the side of your wrist. Hold for 20-30 seconds.',
-      imageUrl: '/images/exercises/thumb-flexor-stretch.jpg',
-      isFree: true
-    },
-    { 
-      id: 'isometricThumbFlexion', 
-      name: 'Isometric Thumb Flexion*',
-      category: 'isometrics',
-      duration: '3 Sets of 45 Seconds',
-      rest: 'Rest 30 Seconds Between Sets',
-      instructions: 'Press the pad of your thumb against the side of your index finger. Apply pressure without moving.',
-      imageUrl: '/images/exercises/isometric-thumb-flexion.jpg',
-      isFree: true
-    },
-    { 
-      id: 'thumbFlexionWithBand', 
-      name: 'Thumb Flexion With Band*',
-      category: 'strength',
-      instructions: 'Place a rubber band around your extended thumb and fingers. Move your thumb across your palm against the resistance, then return to the starting position.',
-      imageUrl: '/images/exercises/thumb-flexion-band.jpg',
-      isFree: true
-    },
-  ],
-  thumbExtensors: [
-    { 
-      id: 'thumbExtensorStretch', 
-      name: 'Thumb Extensor Stretch*',
-      category: 'stretches',
-      sets: '3 Sets of 20-30 Seconds',
-      instructions: 'Gently fold your thumb into your palm and bend your wrist slightly until you feel a stretch along the back of your thumb and wrist. Hold for 20-30 seconds.',
-      imageUrl: '/images/exercises/thumb-extensor-stretch.jpg',
-      isFree: true
-    },
-    { 
-      id: 'isometricThumbExtension', 
-      name: 'Isometric Thumb Extension*',
-      category: 'isometrics',
-      duration: '3 Sets of 45 Seconds',
-      rest: 'Rest 30 Seconds Between Sets',
-      instructions: 'Press the back of your thumb against a stable surface. Apply pressure without moving, engaging the extensor muscles.',
-      imageUrl: '/images/exercises/isometric-thumb-extension.jpg',
-      isFree: true
-    },
-    { 
-      id: 'dbRadialDeviation', 
-      name: 'DB Radial Deviation*',
-      category: 'strength',
-      instructions: 'Rest your forearm on a table with your hand off the edge, thumb facing up. Hold a dumbbell and lift your hand up toward your thumb side, then lower back down.',
-      imageUrl: '/images/exercises/db-radial-deviation.jpg',
-      isFree: true
-    },
-  ]
-};
-
 export default function Dashboard() {
   const { currentUser } = useAuth();
   const router = useRouter();
@@ -181,7 +68,8 @@ export default function Dashboard() {
   const [availablePainRegions, setAvailablePainRegions] = useState([]);
   const [healthScore, setHealthScore] = useState(10); // Default health score
   const [recommendedExercises, setRecommendedExercises] = useState([]);
-  
+  const [weightUnit, setWeightUnit] = useState('lbs');
+
   useEffect(() => {
     // If not logged in, redirect to login
     if (!currentUser) {
@@ -204,6 +92,11 @@ export default function Dashboard() {
         const userDoc = await getUserData(currentUser.uid);
         setUserData(userDoc);
         
+        // Set weight unit preference if available
+        if (userDoc?.preferences?.weightUnit) {
+          setWeightUnit(userDoc.preferences.weightUnit);
+        }
+        
         // Process pain regions
         if (userDoc && userDoc.painRegions) {
           // Convert painRegions object to array of selected region IDs
@@ -218,8 +111,9 @@ export default function Dashboard() {
             setSelectedPainRegion(selectedRegions[0]);
           }
           
-          // Get recommended exercises based on pain regions
-          const exercises = getRecommendedExercises(selectedRegions);
+          // Get recommended exercises based on pain regions and user status
+          const userHasProAccess = isProUser(userDoc);
+          const exercises = getRecommendedExercises(selectedRegions, userHasProAccess);
           setRecommendedExercises(exercises);
         }
         
@@ -240,120 +134,89 @@ export default function Dashboard() {
   }, [currentUser, router]);
   
   // Function to get recommended exercises based on pain regions
-  function getRecommendedExercises(selectedRegions) {
-    // Collect all exercises from selected pain regions
-    const allExercises = [];
+  function getRecommendedExercises(selectedRegions, userHasProAccess) {
+    // Get all exercises for the selected pain regions
+    const allExercises = getExercisesForMultiplePainRegions(selectedRegions);
     
-    // Get exercises from each selected pain region
-    selectedRegions.forEach(regionId => {
-      if (exerciseLibrary[regionId]) {
-        exerciseLibrary[regionId].forEach(exercise => {
-          // Check if this exercise is already in the list to avoid duplicates
-          const isDuplicate = allExercises.some(ex => ex.id === exercise.id);
-          if (!isDuplicate) {
-            // Add region ID to each exercise for reference
-            allExercises.push({
-              ...exercise,
-              painRegion: regionId
-            });
-          }
-        });
-      }
-    });
+    // Filter exercises for free users
+    const accessibleExercises = userHasProAccess 
+      ? allExercises 
+      : allExercises.filter(ex => ex.isFree);
     
     // Ensure we have a good mix by separating the exercises by type
-    const stretches = allExercises.filter(ex => ex.category === 'stretches');
-    const strength = allExercises.filter(ex => ex.category === 'strength');
-    const isometrics = allExercises.filter(ex => ex.category === 'isometrics');
+    const stretches = accessibleExercises.filter(ex => ex.category === 'stretches');
+    const strength = accessibleExercises.filter(ex => ex.category === 'strength');
+    const isometrics = accessibleExercises.filter(ex => ex.category === 'isometrics');
     
-    // Separate free and premium exercises
-    const freeStretches = stretches.filter(ex => ex.isFree);
-    const freeStrength = strength.filter(ex => ex.isFree);
-    const freeIsometrics = isometrics.filter(ex => ex.isFree);
-    
-    const premiumExercises = allExercises.filter(ex => !ex.isFree);
-    
-    // Create a balanced set of exercises
+    // Create a balanced set of exercises (total of 4)
     const selectedExercises = [];
     
-    // First, ensure we have 2 free exercises for all users
-    // Try to get a stretch and a strength exercise
-    if (freeStretches.length > 0) {
-      selectedExercises.push(freeStretches[0]);
+    // Add a variety of exercise types (prefer stretches and strength)
+    if (stretches.length > 0) {
+      selectedExercises.push(stretches[0]);
     }
     
-    if (freeStrength.length > 0) {
-      selectedExercises.push(freeStrength[0]);
+    if (strength.length > 0) {
+      selectedExercises.push(strength[0]);
     }
     
-    // If we don't have 2 yet, try an isometric
-    if (selectedExercises.length < 2 && freeIsometrics.length > 0) {
-      selectedExercises.push(freeIsometrics[0]);
+    if (isometrics.length > 0 && selectedExercises.length < 2) {
+      selectedExercises.push(isometrics[0]);
     }
     
-    // If we still don't have 2, add any remaining free exercises
-    const allFreeExercises = allExercises.filter(ex => ex.isFree);
-    while (selectedExercises.length < 2 && allFreeExercises.length > 0) {
-      // Find an exercise we haven't added yet
-      const remainingFree = allFreeExercises.filter(ex => 
-        !selectedExercises.some(selected => selected.id === ex.id)
-      );
+    // Fill remaining spots with whatever exercises are available
+    const remainingExercises = accessibleExercises.filter(ex => 
+      !selectedExercises.some(selected => selected.id === ex.id)
+    );
+    
+    // Fill in up to 4 total exercises
+    while (selectedExercises.length < 4 && remainingExercises.length > 0) {
+      const index = selectedExercises.length % remainingExercises.length;
+      selectedExercises.push(remainingExercises[index]);
+      remainingExercises.splice(index, 1);
+    }
+    
+    // If we still don't have 4, fill with locked premium exercises for free users
+    if (!userHasProAccess && selectedExercises.length < 4) {
+      const premiumExercises = allExercises.filter(ex => !ex.isFree);
       
-      if (remainingFree.length > 0) {
-        selectedExercises.push(remainingFree[0]);
-      } else {
-        break;
+      for (let i = 0; i < premiumExercises.length && selectedExercises.length < 4; i++) {
+        selectedExercises.push(premiumExercises[i]);
       }
     }
     
-    // Now add 2 premium exercises for the locked slots (or additional free ones if not enough premium)
-    if (premiumExercises.length > 0) {
-      selectedExercises.push(premiumExercises[0]);
-    } else {
-      // If no premium exercises, add another free one
-      const unusedFree = allFreeExercises.filter(ex => 
-        !selectedExercises.some(selected => selected.id === ex.id)
-      );
-      if (unusedFree.length > 0) {
-        selectedExercises.push(unusedFree[0]);
-      }
-    }
-    
-    if (premiumExercises.length > 1) {
-      selectedExercises.push(premiumExercises[1]);
-    } else {
-      // If not enough premium exercises, add another free one
-      const unusedFree = allFreeExercises.filter(ex => 
-        !selectedExercises.some(selected => selected.id === ex.id)
-      );
-      if (unusedFree.length > 0) {
-        selectedExercises.push(unusedFree[0]);
-      } else if (selectedExercises.length > 0) {
-        // If we've run out of exercises, duplicate one with a modified ID
-        selectedExercises.push({
-          ...selectedExercises[0],
-          id: `${selectedExercises[0].id}-alt`
-        });
-      }
-    }
-    
-    // Ensure we have exactly 4 exercises
-    while (selectedExercises.length < 4) {
-      if (selectedExercises.length > 0) {
-        // If we've run out of exercises, duplicate existing ones
-        const index = selectedExercises.length % selectedExercises.length;
-        selectedExercises.push({
-          ...selectedExercises[index],
-          id: `${selectedExercises[index].id}-copy-${selectedExercises.length}`
-        });
-      } else {
-        // Fallback to avoid infinite loop if we somehow have no exercises
-        break;
-      }
-    }
-    
-    // Return exactly 4 exercises
+    // Return exactly 4 exercises or as many as available if less than 4
     return selectedExercises.slice(0, 4);
+  }
+  
+  // Function to convert weight between units
+  function convertWeight(weight, fromUnit, toUnit) {
+    if (fromUnit === toUnit) return weight;
+    
+    if (fromUnit === 'lbs' && toUnit === 'kg') {
+      return Math.round((weight / 2.20462) * 10) / 10; // Round to 1 decimal place
+    } else if (fromUnit === 'kg' && toUnit === 'lbs') {
+      return Math.round(weight * 2.20462); // Round to whole number
+    }
+    
+    return weight; // Default: no conversion
+  }
+  
+  // Function to display weight with unit
+  function getDisplayWeight(exercise) {
+    if (!exercise || exercise.weightType === 'none') return '';
+    
+    // For non-weight exercises (bands, bodyweight), return as is
+    if (exercise.weightType !== 'weight') {
+      return `${exercise.defaultWeight || 1}${exercise.weightUnit || ''}`;
+    }
+    
+    // Handle unit conversion for weight exercises
+    const baseWeight = exercise.defaultWeight || 0;
+    const baseUnit = exercise.weightUnit || 'lbs';
+    const displayWeight = convertWeight(baseWeight, baseUnit, weightUnit);
+    
+    return `${displayWeight} ${weightUnit}`;
   }
   
   function handlePainRegionSelect(regionId) {
@@ -450,7 +313,7 @@ export default function Dashboard() {
         <h3 className="text-xl font-bold mb-4">Exercise Program</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-4">
           {/* Show first 2 exercises normally for all users */}
-          {recommendedExercises.slice(0, 2).map((exercise, index) => (
+          {recommendedExercises.slice(0, userHasProStatus ? 4 : 2).map((exercise, index) => (
             <div key={`${exercise.id}-${index}`} className="bg-white p-2 rounded mb-2">
               <div className="w-full h-36 mb-1 overflow-hidden">
                 {exercise.imageUrl ? (
@@ -464,6 +327,9 @@ export default function Dashboard() {
                 )}
               </div>
               <p className="text-center text-red-500 font-normal">{exercise.name.replace(/\*/g, '')}</p>
+              {exercise.weightType !== 'none' && (
+                <p className="text-center text-xs text-gray-600">{getDisplayWeight(exercise)}</p>
+              )}
             </div>
           ))}
           
@@ -494,25 +360,10 @@ export default function Dashboard() {
                   )}
                 </div>
                 <p className="text-center text-red-500 font-normal">{exercise.name.replace(/\*/g, '')}</p>
-              </div>
-            </div>
-          ))}
-          
-          {/* For pro users, show all exercises normally */}
-          {userHasProStatus && recommendedExercises.slice(2, 4).map((exercise, index) => (
-            <div key={`${exercise.id}-pro-${index}`} className="bg-white p-2 rounded mb-2">
-              <div className="w-full h-36 mb-1 overflow-hidden">
-                {exercise.imageUrl ? (
-                  <img 
-                    src={exercise.imageUrl}
-                    alt={exercise.name.replace(/\*/g, '')}
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <span className="text-gray-500">Exercise Image</span>
+                {exercise.weightType !== 'none' && (
+                  <p className="text-center text-xs text-gray-600">{getDisplayWeight(exercise)}</p>
                 )}
               </div>
-              <p className="text-center text-red-500 font-normal">{exercise.name.replace(/\*/g, '')}</p>
             </div>
           ))}
         </div>
@@ -541,7 +392,7 @@ export default function Dashboard() {
               <div className="bg-white p-4 border-b border-r">
                 <h4 className="font-medium text-gray-800 mb-2">Wrist Flexor Endurance</h4>
                 <p className="text-xl font-bold">
-                  {userData?.wristFlexorEndurance?.weight || 6} Lbs
+                  {userData?.wristFlexorEndurance?.weight || 6} {userData?.preferences?.weightUnit || 'lbs'}
                 </p>
                 <p className="text-xl font-bold">
                   {userData?.wristFlexorEndurance?.repMax || 40} Rep Max
