@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/contexts/AuthContext';
-import { getDoc, setDoc, doc } from 'firebase/firestore';
+import { getDoc, setDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import AssessmentLayout from '@/components/AssessmentLayout';
 
@@ -88,15 +88,20 @@ export default function OutcomeMeasure() {
         if (userDoc.exists()) {
           const userData = userDoc.data();
           
-          // Check for completion of previous steps
-          if (!userData.userDetailsCompleted) {
-            router.push('/user-details');
-            return;
-          }
+          // Check if this is a follow-up assessment
+          const isFollowUp = router.query.returnTo ? true : false;
           
-          if (!userData.medicalScreeningCompleted) {
-            router.push('/medical-screen');
-            return;
+          if (!isFollowUp) {
+            // Only enforce step order for initial assessment
+            if (!userData.userDetailsCompleted) {
+              router.push('/user-details');
+              return;
+            }
+            
+            if (!userData.medicalScreeningCompleted) {
+              router.push('/medical-screen');
+              return;
+            }
           }
           
           // If already completed this step, load previous answers
@@ -109,14 +114,16 @@ export default function OutcomeMeasure() {
             setIsWorking(userData.outcomeMeasureData.isWorking || false);
           }
           
-          // If already completed assessment, go to dashboard
-          if (userData.assessmentCompleted) {
+          // If already completed assessment and not a follow-up, go to dashboard
+          if (userData.assessmentCompleted && !isFollowUp) {
             router.push('/dashboard');
             return;
           }
         } else {
-          // If no user data, redirect to first step
-          router.push('/user-details');
+          // If no user data and not a follow-up, redirect to first step
+          if (!router.query.returnTo) {
+            router.push('/user-details');
+          }
         }
       } catch (error) {
         console.error("Error loading outcome measure data:", error);
@@ -213,6 +220,9 @@ export default function OutcomeMeasure() {
       // Calculate scores
       const scores = calculateScores();
       
+      // Check if this is a follow-up assessment
+      const isFollowUp = router.query.returnTo ? true : false;
+      
       // Prepare data for storage
       const outcomeData = {
         responses: answers,
@@ -235,11 +245,25 @@ export default function OutcomeMeasure() {
       // Also store in a subcollection for history
       await setDoc(doc(db, "users", currentUser.uid, "outcomeMeasures", new Date().toISOString()), outcomeData);
       
+      // If this is a follow-up assessment, update the next due date (7 days from now)
+      if (isFollowUp) {
+        const nextDueDate = new Date();
+        nextDueDate.setDate(nextDueDate.getDate() + 7);
+        
+        await updateDoc(doc(db, "users", currentUser.uid), {
+          nextQuickDashDueDate: nextDueDate
+        });
+      }
+      
       setSaveStatus('Assessment saved successfully!');
       
-      // Navigate to next step
+      // Navigate to next step or return to previous page
       setTimeout(() => {
-        router.push('/pain-region');
+        if (isFollowUp && router.query.returnTo) {
+          router.push(router.query.returnTo);
+        } else {
+          router.push('/pain-region'); // Normal assessment flow
+        }
       }, 1000);
     } catch (error) {
       console.error("Error saving outcome measure:", error);
@@ -251,6 +275,11 @@ export default function OutcomeMeasure() {
   
   // Handle back button
   function handleBack() {
+    if (router.query.returnTo) {
+      router.push(router.query.returnTo);
+      return;
+    }
+    
     if (section === 'core') {
       router.push('/medical-screen');
     } else if (section === 'work') {

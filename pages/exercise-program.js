@@ -17,6 +17,7 @@ import {
   updateExerciseTracking, 
   getExerciseTrackingForDate 
 } from '@/lib/exercisePrescriptionUtils';
+import QuickDashReminder from '@/components/QuickDashReminder';
 
 // Custom hook to play metronome
 function useMetronome() {
@@ -718,6 +719,8 @@ export default function ExerciseProgram() {
 
   return (
     <ProtectedPage>
+      <QuickDashReminder />
+
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Today's Exercises</h1>
         
