@@ -8,7 +8,11 @@ import { db } from '@/lib/firebase';
 import { isProUser } from '@/lib/userUtils';
 import Image from 'next/image';
 import { exerciseLibrary, painRegionToTestMapping } from '@/lib/exerciseData';
-import { getExercisePrescription, updateExerciseTracking } from '@/lib/exercisePrescriptionUtils';
+import { 
+  getExercisePrescription, 
+  updateExerciseTracking, 
+  getExerciseTrackingForDate 
+} from '@/lib/exercisePrescriptionUtils';
 
 // Neural Mobility Exercises
 const neuralMobilityExercises = {
@@ -106,6 +110,106 @@ function useMetronome() {
   return { isPlaying, togglePlay };
 }
 
+// Function to get recommended exercises
+function getRecommendedExercises(selectedRegions) {
+  const allExercises = [];
+  const exerciseSet = new Set(); // Use a Set to track unique exercise IDs
+
+  // Collect exercises from each selected pain region
+  selectedRegions.forEach((regionId) => {
+    if (exerciseLibrary[regionId]) {
+      exerciseLibrary[regionId].forEach((exercise) => {
+        const exerciseKey = exercise.id; // Use only the exercise ID for deduplication
+        if (!exerciseSet.has(exerciseKey)) {
+          exerciseSet.add(exerciseKey); // Add the exercise ID to the Set
+          allExercises.push({
+            ...exercise,
+            painRegion: regionId, // Keep the pain region for reference
+          });
+        }
+      });
+    }
+  });
+
+  // Ensure we have a good mix by separating the exercises by type
+  const stretches = allExercises.filter((ex) => ex.category === 'stretches');
+  const strength = allExercises.filter((ex) => ex.category === 'strength');
+  const isometrics = allExercises.filter((ex) => ex.category === 'isometrics');
+
+  // Separate free and premium exercises
+  const freeStretches = stretches.filter((ex) => ex.isFree);
+  const freeStrength = strength.filter((ex) => ex.isFree);
+  const freeIsometrics = isometrics.filter((ex) => ex.isFree);
+
+  const premiumExercises = allExercises.filter((ex) => !ex.isFree);
+
+  // Create a balanced set of exercises
+  const selectedExercises = [];
+
+  // First, ensure we have 2 free exercises for all users
+  if (freeStretches.length > 0) {
+    selectedExercises.push(freeStretches[0]);
+  }
+
+  if (freeStrength.length > 0) {
+    selectedExercises.push(freeStrength[0]);
+  }
+
+  if (selectedExercises.length < 2 && freeIsometrics.length > 0) {
+    selectedExercises.push(freeIsometrics[0]);
+  }
+
+  const allFreeExercises = allExercises.filter((ex) => ex.isFree);
+  while (selectedExercises.length < 2 && allFreeExercises.length > 0) {
+    const remainingFree = allFreeExercises.filter(
+      (ex) => !selectedExercises.some((selected) => selected.id === ex.id)
+    );
+    if (remainingFree.length > 0) {
+      selectedExercises.push(remainingFree[0]);
+    } else {
+      break;
+    }
+  }
+
+  // Add 2 premium exercises (or additional free ones if not enough premium)
+  if (premiumExercises.length > 0) {
+    selectedExercises.push(premiumExercises[0]);
+  } else {
+    const unusedFree = allFreeExercises.filter(
+      (ex) => !selectedExercises.some((selected) => selected.id === ex.id)
+    );
+    if (unusedFree.length > 0) {
+      selectedExercises.push(unusedFree[0]);
+    }
+  }
+
+  if (premiumExercises.length > 1) {
+    selectedExercises.push(premiumExercises[1]);
+  } else {
+    const unusedFree = allFreeExercises.filter(
+      (ex) => !selectedExercises.some((selected) => selected.id === ex.id)
+    );
+    if (unusedFree.length > 0) {
+      selectedExercises.push(unusedFree[0]);
+    }
+  }
+
+  // Ensure we have exactly 4 exercises
+  while (selectedExercises.length < 4) {
+    if (selectedExercises.length > 0) {
+      const index = selectedExercises.length % selectedExercises.length;
+      selectedExercises.push({
+        ...selectedExercises[index],
+        id: `${selectedExercises[index].id}-copy-${selectedExercises.length}`,
+      });
+    } else {
+      break;
+    }
+  }
+
+  return selectedExercises.slice(0, 4);
+}
+
 export default function ExerciseProgram() {
   const { currentUser } = useAuth();
   const router = useRouter();
@@ -121,13 +225,38 @@ export default function ExerciseProgram() {
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [allExercises, setAllExercises] = useState([]);
   const [userData, setUserData] = useState(null); // Store the entire user data for pro status check
-  const { isPlaying, togglePlay } = useMetronome();
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef(null);
   
   // NEW: Add state for prescriptions
   const [prescriptions, setPrescriptions] = useState({});
   const [exerciseReps, setExerciseReps] = useState('');
   const [exercisePain, setExercisePain] = useState('0');
   const [trackingLoading, setTrackingLoading] = useState(false);
+  const [dateLoading, setDateLoading] = useState(false);
+
+  // Initialize metronome
+  useEffect(() => {
+    audioRef.current = new Audio('/sounds/metronome-50bpm.mp3');
+    audioRef.current.loop = true;
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  // Toggle metronome playback
+  const togglePlay = () => {
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
 
   // Function to get all exercises in a single array
   const getAllExercises = () => {
@@ -260,6 +389,9 @@ export default function ExerciseProgram() {
           
           setPrescriptions(fetchedPrescriptions);
           setAllExercises(allExercisesArr);
+          
+          // Load completion state for the selected date
+          loadExerciseCompletionForDate(selectedDate);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -275,6 +407,64 @@ export default function ExerciseProgram() {
   useEffect(() => {
     setAllExercises(getAllExercises());
   }, [exercises]);
+  
+  // NEW: Load exercise completion data when date changes
+  const loadExerciseCompletionForDate = async (date) => {
+    if (!currentUser) return;
+    
+    try {
+      setDateLoading(true);
+      
+      // Reset all completions first
+      setExercises(prev => {
+        const newExercises = {};
+        Object.keys(prev).forEach(category => {
+          newExercises[category] = prev[category].map(exercise => ({
+            ...exercise,
+            completedAM: false,
+            completedPM: false
+          }));
+        });
+        return newExercises;
+      });
+      
+      // Fetch tracking data for the selected date
+      const trackingData = await getExerciseTrackingForDate(currentUser.uid, date);
+      
+      // Update completion states based on tracking data
+      setExercises(prev => {
+        const newExercises = { ...prev };
+        
+        // Update each category
+        Object.keys(newExercises).forEach(category => {
+          newExercises[category] = newExercises[category].map(exercise => {
+            const exerciseTracking = trackingData[exercise.id] || [];
+            
+            // Check if completed for AM/PM
+            const completedAM = exerciseTracking.some(instance => 
+              instance.timeOfDay === 'AM' && instance.completed
+            );
+            
+            const completedPM = exerciseTracking.some(instance => 
+              instance.timeOfDay === 'PM' && instance.completed
+            );
+            
+            return {
+              ...exercise,
+              completedAM,
+              completedPM
+            };
+          });
+        });
+        
+        return newExercises;
+      });
+    } catch (error) {
+      console.error("Error loading exercise completion data:", error);
+    } finally {
+      setDateLoading(false);
+    }
+  };
 
   // Function to format date for display
   function formatDate(date) {
@@ -287,6 +477,7 @@ export default function ExerciseProgram() {
     const newDate = new Date(selectedDate);
     newDate.setDate(selectedDate.getDate() - 1);
     setSelectedDate(newDate);
+    loadExerciseCompletionForDate(newDate);
   }
 
   // Function to go to next day
@@ -294,6 +485,7 @@ export default function ExerciseProgram() {
     const newDate = new Date(selectedDate);
     newDate.setDate(selectedDate.getDate() + 1);
     setSelectedDate(newDate);
+    loadExerciseCompletionForDate(newDate);
   }
 
   // Function to toggle AM/PM
@@ -301,12 +493,19 @@ export default function ExerciseProgram() {
     setTimeOfDay(time);
   }
 
-  // Function to mark an exercise as complete based on time of day
-  function toggleExerciseCompletion(category, id) {
+  // Function to mark or unmark an exercise as complete based on time of day
+  async function toggleExerciseCompletion(category, id) {
+    // Get the current completion state of the exercise
+    const exercise = exercises[category].find(ex => ex.id === id);
+    const currentCompletionState = timeOfDay === 'AM' 
+      ? exercise.completedAM
+      : exercise.completedPM;
+    
+    // First update the UI state (toggling the completion state)
     setExercises(prev => {
       const updatedCategory = prev[category].map(exercise => {
         if (exercise.id === id) {
-          // Update the correct time of day completion status
+          // Toggle the correct time of day completion status
           if (timeOfDay === 'AM') {
             return { ...exercise, completedAM: !exercise.completedAM };
           } else {
@@ -322,29 +521,58 @@ export default function ExerciseProgram() {
       };
     });
     
-    // FREE USER TRACKING - Simple completion without reps/pain tracking
-    if (currentUser && !isProUser(userData)) {
+    // The new state is the opposite of the current state
+    const isComplete = !currentCompletionState;
+    
+    // Update in Firebase
+    if (currentUser) {
       try {
-        updateExerciseTracking(currentUser.uid, id, {
-          completed: true,
+        const trackingData = {
+          completed: isComplete,
           repsPerformed: null,
           painLevel: null,
           timeOfDay: timeOfDay
-        }).then(updatedPrescription => {
-          // Update the prescription in state
-          setPrescriptions(prev => ({
-            ...prev,
-            [id]: updatedPrescription
-          }));
-        });
+        };
+        
+        const updatedPrescription = await updateExerciseTracking(
+          currentUser.uid, 
+          id, 
+          trackingData,
+          selectedDate
+        );
+        
+        // Update the prescription in state
+        setPrescriptions(prev => ({
+          ...prev,
+          [id]: updatedPrescription
+        }));
       } catch (error) {
-        console.error("Error updating free user tracking:", error);
+        console.error(`Error updating exercise tracking for ${id}:`, error);
+        // Revert the UI change on error
+        setExercises(prev => {
+          const updatedCategory = prev[category].map(exercise => {
+            if (exercise.id === id) {
+              if (timeOfDay === 'AM') {
+                return { ...exercise, completedAM: exercise.completedAM };
+              } else {
+                return { ...exercise, completedPM: exercise.completedPM };
+              }
+            }
+            return exercise;
+          });
+          
+          return {
+            ...prev,
+            [category]: updatedCategory
+          };
+        });
       }
     }
   }
 
   // Quick complete all exercises for the current time of day
-  function quickComplete() {
+  async function quickComplete() {
+    // First update the UI
     setExercises(prev => {
       const updated = {};
       Object.keys(prev).forEach(category => {
@@ -359,29 +587,43 @@ export default function ExerciseProgram() {
       return updated;
     });
     
-    // For free users, mark all exercises as complete in Firebase
-    if (currentUser && !isProUser(userData)) {
+    // Then update Firebase for all exercises
+    if (currentUser) {
       const allExercises = getAllExercises();
       
-      // Update each exercise asynchronously
-      allExercises.forEach(exercise => {
-        try {
-          updateExerciseTracking(currentUser.uid, exercise.id, {
+      const promises = allExercises.map(exercise => {
+        // Skip locked exercises for free users
+        if (!isProUser(userData) && !exercise.isFree) {
+          return Promise.resolve();
+        }
+        
+        return updateExerciseTracking(
+          currentUser.uid, 
+          exercise.id, 
+          {
             completed: true,
             repsPerformed: null, 
             painLevel: null,
             timeOfDay: timeOfDay
-          }).then(updatedPrescription => {
-            // Update the prescription in state
-            setPrescriptions(prev => ({
-              ...prev,
-              [exercise.id]: updatedPrescription
-            }));
-          });
-        } catch (error) {
+          },
+          selectedDate
+        ).then(updatedPrescription => {
+          // Update the prescription in state
+          setPrescriptions(prev => ({
+            ...prev,
+            [exercise.id]: updatedPrescription
+          }));
+        }).catch(error => {
           console.error(`Error quick completing ${exercise.id}:`, error);
-        }
+        });
       });
+      
+      // Wait for all updates to complete
+      try {
+        await Promise.all(promises);
+      } catch (error) {
+        console.error("Error during quick complete:", error);
+      }
     }
   }
 
@@ -509,7 +751,8 @@ export default function ExerciseProgram() {
       const updatedPrescription = await updateExerciseTracking(
         currentUser.uid,
         selectedExercise.id,
-        trackingData
+        trackingData,
+        selectedDate
       );
       
       // Update prescriptions state
@@ -549,7 +792,7 @@ export default function ExerciseProgram() {
     }
   }
 
-  // If not logged in, show loading
+  // If not logged in or still loading, show loading
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -611,16 +854,24 @@ export default function ExerciseProgram() {
               onClick={prevDay} 
               className="p-2 rounded-full hover:bg-gray-200"
               aria-label="Previous Day"
+              disabled={dateLoading}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
             </button>
-            <div className="mx-4 text-lg font-medium">{formatDate(selectedDate)}</div>
+            <div className="mx-4 text-lg font-medium">
+              {dateLoading ? (
+                <span className="inline-block w-32 text-center">Loading...</span>
+              ) : (
+                formatDate(selectedDate)
+              )}
+            </div>
             <button 
               onClick={nextDay} 
               className="p-2 rounded-full hover:bg-gray-200"
               aria-label="Next Day"
+              disabled={dateLoading}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
@@ -628,30 +879,48 @@ export default function ExerciseProgram() {
             </button>
           </div>
 
-          {/* AM/PM Toggle */}
+          {/* AM/PM Toggle with Enhanced Visual Differentiator */}
           <div className="flex justify-center mb-8">
             <div className="inline-flex rounded-md shadow-sm">
               <button
                 type="button"
-                className={`px-4 py-2 text-sm font-medium rounded-l-md ${
+                className={`px-6 py-3 text-sm font-medium rounded-l-md flex items-center space-x-2 transition-all ${
                   timeOfDay === 'AM'
-                    ? 'bg-red-500 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                    ? 'bg-red-500 text-white font-bold shadow-md border-2 border-red-600'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 opacity-75'
                 }`}
                 onClick={() => toggleTimeOfDay('AM')}
               >
-                AM
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                </svg>
+                <span>AM</span>
+                {timeOfDay === 'AM' && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                  </span>
+                )}
               </button>
               <button
                 type="button"
-                className={`px-4 py-2 text-sm font-medium rounded-r-md ${
+                className={`px-6 py-3 text-sm font-medium rounded-r-md flex items-center space-x-2 transition-all ${
                   timeOfDay === 'PM'
-                    ? 'bg-red-500 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                    ? 'bg-red-500 text-white font-bold shadow-md border-2 border-red-600'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 opacity-75'
                 }`}
                 onClick={() => toggleTimeOfDay('PM')}
               >
-                PM
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                </svg>
+                <span>PM</span>
+                {timeOfDay === 'PM' && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -702,10 +971,22 @@ export default function ExerciseProgram() {
                         {/* Exercise controls (only shown for accessible exercises) */}
                         {canAccessExercise(exercise) && (
                           isExerciseCompleted(exercise) ? (
-                            <span className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full">✓</span>
+                            <div className="flex items-center">
+                              <button
+                                className="mr-2 px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExerciseCompletion('stretches', exercise.id);
+                                }}
+                                title="Unmark as completed"
+                              >
+                                UNDO
+                              </button>
+                              <span className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full">✓</span>
+                            </div>
                           ) : (
                             <button 
-                              className="px-3 py-1 bg-red-500 text-white rounded-md text-sm"
+                              className="px-3 py-1 bg-red-500 text-white rounded-md text-sm hover:bg-red-600"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleExerciseCompletion('stretches', exercise.id);
@@ -767,10 +1048,22 @@ export default function ExerciseProgram() {
                         {/* Exercise controls (only shown for accessible exercises) */}
                         {canAccessExercise(exercise) && (
                           isExerciseCompleted(exercise) ? (
-                            <span className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full">✓</span>
+                            <div className="flex items-center">
+                              <button
+                                className="mr-2 px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExerciseCompletion('isometrics', exercise.id);
+                                }}
+                                title="Unmark as completed"
+                              >
+                                UNDO
+                              </button>
+                              <span className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full">✓</span>
+                            </div>
                           ) : (
                             <button 
-                              className="px-3 py-1 bg-red-500 text-white rounded-md text-sm"
+                              className="px-3 py-1 bg-red-500 text-white rounded-md text-sm hover:bg-red-600"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleExerciseCompletion('isometrics', exercise.id);
@@ -836,10 +1129,22 @@ export default function ExerciseProgram() {
                         {/* Exercise controls (only shown for accessible exercises) */}
                         {canAccessExercise(exercise) && (
                           isExerciseCompleted(exercise) ? (
-                            <span className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full">✓</span>
+                            <div className="flex items-center">
+                              <button
+                                className="mr-2 px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExerciseCompletion('strength', exercise.id);
+                                }}
+                                title="Unmark as completed"
+                              >
+                                UNDO
+                              </button>
+                              <span className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full">✓</span>
+                            </div>
                           ) : (
                             <button 
-                              className="px-3 py-1 bg-red-500 text-white rounded-md text-sm"
+                              className="px-3 py-1 bg-red-500 text-white rounded-md text-sm hover:bg-red-600"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleExerciseCompletion('strength', exercise.id);
@@ -892,10 +1197,22 @@ export default function ExerciseProgram() {
                       {/* Exercise controls (only shown for accessible exercises) */}
                       {canAccessExercise(exercise) && (
                         isExerciseCompleted(exercise) ? (
-                          <span className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full">✓</span>
+                          <div className="flex items-center">
+                            <button
+                              className="mr-2 px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExerciseCompletion('neural', exercise.id);
+                              }}
+                              title="Unmark as completed"
+                            >
+                              UNDO
+                            </button>
+                            <span className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full">✓</span>
+                          </div>
                         ) : (
                           <button 
-                            className="px-3 py-1 bg-red-500 text-white rounded-md text-sm"
+                            className="px-3 py-1 bg-red-500 text-white rounded-md text-sm hover:bg-red-600"
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleExerciseCompletion('neural', exercise.id);
@@ -928,11 +1245,12 @@ export default function ExerciseProgram() {
             <button 
               className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
               onClick={quickComplete}
+              disabled={dateLoading}
             >
-              Quick Complete
+              {dateLoading ? "Loading..." : "Quick Complete"}
             </button>
-            <p className="text-sm text-gray-600 mt-2">Free users can mark exercises as complete without detailed tracking.</p>
-            <p className="text-sm text-gray-500 mt-1">Current session: {timeOfDay}</p>
+            <p className="text-sm text-gray-600 mt-2">Marks all exercises as complete for the {timeOfDay} session.</p>
+            <p className="text-sm text-gray-500 mt-1">Current date: {formatDate(selectedDate)}</p>
           </div>
         </main>
       </div>
@@ -1054,17 +1372,47 @@ export default function ExerciseProgram() {
                       <div className="flex space-x-2">
                         <button 
                           type="button"
-                          className={`px-3 py-1 border rounded-md ${isExerciseCompleted(selectedExercise) ? 'bg-green-100 border-green-500' : 'bg-white'}`}
-                          onClick={() => toggleExerciseCompletion(selectedExercise.category, selectedExercise.id)}
+                          className={`px-4 py-2 border rounded-md transition-all ${
+                            isExerciseCompleted(selectedExercise) 
+                              ? 'bg-green-100 border-green-500 font-medium shadow-sm' 
+                              : 'bg-white hover:bg-gray-50'
+                          }`}
+                          onClick={() => {
+                            if (!isExerciseCompleted(selectedExercise)) {
+                              toggleExerciseCompletion(selectedExercise.category, selectedExercise.id);
+                            }
+                          }}
                         >
-                          Yes
+                          <div className="flex items-center">
+                            {isExerciseCompleted(selectedExercise) && (
+                              <svg className="w-4 h-4 mr-1 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                            Yes
+                          </div>
                         </button>
                         <button 
                           type="button"
-                          className={`px-3 py-1 border rounded-md ${!isExerciseCompleted(selectedExercise) ? 'bg-red-100 border-red-500' : 'bg-white'}`}
-                          onClick={() => toggleExerciseCompletion(selectedExercise.category, selectedExercise.id)}
+                          className={`px-4 py-2 border rounded-md transition-all ${
+                            !isExerciseCompleted(selectedExercise) 
+                              ? 'bg-red-100 border-red-500 font-medium shadow-sm' 
+                              : 'bg-white hover:bg-gray-50'
+                          }`}
+                          onClick={() => {
+                            if (isExerciseCompleted(selectedExercise)) {
+                              toggleExerciseCompletion(selectedExercise.category, selectedExercise.id);
+                            }
+                          }}
                         >
-                          No
+                          <div className="flex items-center">
+                            {!isExerciseCompleted(selectedExercise) && (
+                              <svg className="w-4 h-4 mr-1 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                            No
+                          </div>
                         </button>
                       </div>
                     </div>
