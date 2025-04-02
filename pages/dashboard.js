@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+// pages/dashboard.js
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserData } from '@/lib/firestoreUtils';
-import { hasCompletedAssessment, isProUser } from '@/lib/userUtils'; // Import the isProUser utility
-import Image from 'next/image';
+import { hasCompletedAssessment, isProUser } from '@/lib/userUtils';
 import QuickStats from '@/components/QuickStats';
-
+import ProtectedPage from '@/components/layouts/ProtectedPage';
 
 // Pain region data with descriptions
 const painRegionData = {
@@ -61,17 +61,15 @@ const exerciseLibrary = {
       category: 'stretches',
       sets: '3 Sets of 20-30 Seconds',
       instructions: 'With your elbow straight, use your opposite hand to bend your wrist upward until you feel a stretch on the bottom of your forearm. Hold for 20-30 seconds.',
-      imageUrl: '/exercises/wrist-flexor-stretch.jpg',
+      imageUrl: '/images/exercises/wrist-flexor-stretch.jpg',
       isFree: true
     },
     { 
       id: 'dbWristFlexion', 
       name: 'DB Wrist Flexion*',
       category: 'strength',
-      reps: '25',
-      weight: '6lbs',
       instructions: 'Sit with your forearm resting on a table, palm facing up, with wrist at the edge. Hold a dumbbell and lower it down, then curl it up using only your wrist.',
-      imageUrl: '/exercises/db-wrist-flexion.jpg',
+      imageUrl: '/images/exercises/db-wrist-flexion.jpg',
       isFree: true
     },
     { 
@@ -81,15 +79,101 @@ const exerciseLibrary = {
       duration: '3 Sets of 45 Seconds',
       rest: 'Rest 30 Seconds Between Sets',
       instructions: 'Place your palm against a stable surface. Push into the surface without moving your wrist, creating tension in your flexor muscles.',
-      imageUrl: '/exercises/isometric-wrist-flexion.jpg',
+      imageUrl: '/images/exercises/isometric-wrist-flexion.jpg',
       isFree: true
     },
   ],
-  // Other exercise categories are omitted for brevity
+  wristExtensors: [
+    { 
+      id: 'wristExtensorStretch', 
+      name: 'Wrist Extensor Stretch*',
+      category: 'stretches',
+      sets: '3 Sets of 20-30 Seconds',
+      instructions: 'With your elbow straight, use your opposite hand to bend your wrist downward until you feel a stretch on the top of your forearm. Hold for 20-30 seconds.',
+      imageUrl: '/images/exercises/wrist-extensor-stretch.jpg',
+      isFree: true
+    },
+    { 
+      id: 'isometricWristExtension', 
+      name: 'Isometric Wrist Extension*',
+      category: 'isometrics',
+      duration: '3 Sets of 45 Seconds',
+      rest: 'Rest 30 Seconds Between Sets',
+      instructions: 'Place the back of your hand against a stable surface. Push into the surface without moving your wrist, creating tension in your extensor muscles.',
+      imageUrl: '/images/exercises/isometric-wrist-extension.jpg',
+      isFree: true
+    },
+    { 
+      id: 'dbWristExtension', 
+      name: 'DB Wrist Extension*',
+      category: 'strength',
+      instructions: 'Sit with your forearm resting on a table, palm facing down, with wrist at the edge. Hold a dumbbell and lower it down, then lift it up using only your wrist.',
+      imageUrl: '/images/exercises/db-wrist-extension.jpg',
+      isFree: true
+    },
+  ],
+  thumbFlexors: [
+    { 
+      id: 'thumbFlexorStretch', 
+      name: 'Thumb Flexor Stretch*',
+      category: 'stretches',
+      sets: '3 Sets of 20-30 Seconds',
+      instructions: 'Gently pull your thumb backward with your other hand until you feel a stretch at the base of your thumb and the side of your wrist. Hold for 20-30 seconds.',
+      imageUrl: '/images/exercises/thumb-flexor-stretch.jpg',
+      isFree: true
+    },
+    { 
+      id: 'isometricThumbFlexion', 
+      name: 'Isometric Thumb Flexion*',
+      category: 'isometrics',
+      duration: '3 Sets of 45 Seconds',
+      rest: 'Rest 30 Seconds Between Sets',
+      instructions: 'Press the pad of your thumb against the side of your index finger. Apply pressure without moving.',
+      imageUrl: '/images/exercises/isometric-thumb-flexion.jpg',
+      isFree: true
+    },
+    { 
+      id: 'thumbFlexionWithBand', 
+      name: 'Thumb Flexion With Band*',
+      category: 'strength',
+      instructions: 'Place a rubber band around your extended thumb and fingers. Move your thumb across your palm against the resistance, then return to the starting position.',
+      imageUrl: '/images/exercises/thumb-flexion-band.jpg',
+      isFree: true
+    },
+  ],
+  thumbExtensors: [
+    { 
+      id: 'thumbExtensorStretch', 
+      name: 'Thumb Extensor Stretch*',
+      category: 'stretches',
+      sets: '3 Sets of 20-30 Seconds',
+      instructions: 'Gently fold your thumb into your palm and bend your wrist slightly until you feel a stretch along the back of your thumb and wrist. Hold for 20-30 seconds.',
+      imageUrl: '/images/exercises/thumb-extensor-stretch.jpg',
+      isFree: true
+    },
+    { 
+      id: 'isometricThumbExtension', 
+      name: 'Isometric Thumb Extension*',
+      category: 'isometrics',
+      duration: '3 Sets of 45 Seconds',
+      rest: 'Rest 30 Seconds Between Sets',
+      instructions: 'Press the back of your thumb against a stable surface. Apply pressure without moving, engaging the extensor muscles.',
+      imageUrl: '/images/exercises/isometric-thumb-extension.jpg',
+      isFree: true
+    },
+    { 
+      id: 'dbRadialDeviation', 
+      name: 'DB Radial Deviation*',
+      category: 'strength',
+      instructions: 'Rest your forearm on a table with your hand off the edge, thumb facing up. Hold a dumbbell and lift your hand up toward your thumb side, then lower back down.',
+      imageUrl: '/images/exercises/db-radial-deviation.jpg',
+      isFree: true
+    },
+  ]
 };
 
 export default function Dashboard() {
-  const { currentUser, logout } = useAuth();
+  const { currentUser } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
@@ -155,122 +239,122 @@ export default function Dashboard() {
     loadUserData();
   }, [currentUser, router]);
   
-// Function to get recommended exercises based on pain regions
-function getRecommendedExercises(selectedRegions) {
-  // Collect all exercises from selected pain regions
-  const allExercises = [];
-  
-  // Get exercises from each selected pain region
-  selectedRegions.forEach(regionId => {
-    if (exerciseLibrary[regionId]) {
-      exerciseLibrary[regionId].forEach(exercise => {
-        // Check if this exercise is already in the list to avoid duplicates
-        const isDuplicate = allExercises.some(ex => ex.id === exercise.id);
-        if (!isDuplicate) {
-          // Add region ID to each exercise for reference
-          allExercises.push({
-            ...exercise,
-            painRegion: regionId
-          });
-        }
-      });
-    }
-  });
-  
-  // Ensure we have a good mix by separating the exercises by type
-  const stretches = allExercises.filter(ex => ex.category === 'stretches');
-  const strength = allExercises.filter(ex => ex.category === 'strength');
-  const isometrics = allExercises.filter(ex => ex.category === 'isometrics');
-  
-  // Separate free and premium exercises
-  const freeStretches = stretches.filter(ex => ex.isFree);
-  const freeStrength = strength.filter(ex => ex.isFree);
-  const freeIsometrics = isometrics.filter(ex => ex.isFree);
-  
-  const premiumExercises = allExercises.filter(ex => !ex.isFree);
-  
-  // Create a balanced set of exercises
-  const selectedExercises = [];
-  
-  // First, ensure we have 2 free exercises for all users
-  // Try to get a stretch and a strength exercise
-  if (freeStretches.length > 0) {
-    selectedExercises.push(freeStretches[0]);
-  }
-  
-  if (freeStrength.length > 0) {
-    selectedExercises.push(freeStrength[0]);
-  }
-  
-  // If we don't have 2 yet, try an isometric
-  if (selectedExercises.length < 2 && freeIsometrics.length > 0) {
-    selectedExercises.push(freeIsometrics[0]);
-  }
-  
-  // If we still don't have 2, add any remaining free exercises
-  const allFreeExercises = allExercises.filter(ex => ex.isFree);
-  while (selectedExercises.length < 2 && allFreeExercises.length > 0) {
-    // Find an exercise we haven't added yet
-    const remainingFree = allFreeExercises.filter(ex => 
-      !selectedExercises.some(selected => selected.id === ex.id)
-    );
+  // Function to get recommended exercises based on pain regions
+  function getRecommendedExercises(selectedRegions) {
+    // Collect all exercises from selected pain regions
+    const allExercises = [];
     
-    if (remainingFree.length > 0) {
-      selectedExercises.push(remainingFree[0]);
+    // Get exercises from each selected pain region
+    selectedRegions.forEach(regionId => {
+      if (exerciseLibrary[regionId]) {
+        exerciseLibrary[regionId].forEach(exercise => {
+          // Check if this exercise is already in the list to avoid duplicates
+          const isDuplicate = allExercises.some(ex => ex.id === exercise.id);
+          if (!isDuplicate) {
+            // Add region ID to each exercise for reference
+            allExercises.push({
+              ...exercise,
+              painRegion: regionId
+            });
+          }
+        });
+      }
+    });
+    
+    // Ensure we have a good mix by separating the exercises by type
+    const stretches = allExercises.filter(ex => ex.category === 'stretches');
+    const strength = allExercises.filter(ex => ex.category === 'strength');
+    const isometrics = allExercises.filter(ex => ex.category === 'isometrics');
+    
+    // Separate free and premium exercises
+    const freeStretches = stretches.filter(ex => ex.isFree);
+    const freeStrength = strength.filter(ex => ex.isFree);
+    const freeIsometrics = isometrics.filter(ex => ex.isFree);
+    
+    const premiumExercises = allExercises.filter(ex => !ex.isFree);
+    
+    // Create a balanced set of exercises
+    const selectedExercises = [];
+    
+    // First, ensure we have 2 free exercises for all users
+    // Try to get a stretch and a strength exercise
+    if (freeStretches.length > 0) {
+      selectedExercises.push(freeStretches[0]);
+    }
+    
+    if (freeStrength.length > 0) {
+      selectedExercises.push(freeStrength[0]);
+    }
+    
+    // If we don't have 2 yet, try an isometric
+    if (selectedExercises.length < 2 && freeIsometrics.length > 0) {
+      selectedExercises.push(freeIsometrics[0]);
+    }
+    
+    // If we still don't have 2, add any remaining free exercises
+    const allFreeExercises = allExercises.filter(ex => ex.isFree);
+    while (selectedExercises.length < 2 && allFreeExercises.length > 0) {
+      // Find an exercise we haven't added yet
+      const remainingFree = allFreeExercises.filter(ex => 
+        !selectedExercises.some(selected => selected.id === ex.id)
+      );
+      
+      if (remainingFree.length > 0) {
+        selectedExercises.push(remainingFree[0]);
+      } else {
+        break;
+      }
+    }
+    
+    // Now add 2 premium exercises for the locked slots (or additional free ones if not enough premium)
+    if (premiumExercises.length > 0) {
+      selectedExercises.push(premiumExercises[0]);
     } else {
-      break;
+      // If no premium exercises, add another free one
+      const unusedFree = allFreeExercises.filter(ex => 
+        !selectedExercises.some(selected => selected.id === ex.id)
+      );
+      if (unusedFree.length > 0) {
+        selectedExercises.push(unusedFree[0]);
+      }
     }
-  }
-  
-  // Now add 2 premium exercises for the locked slots (or additional free ones if not enough premium)
-  if (premiumExercises.length > 0) {
-    selectedExercises.push(premiumExercises[0]);
-  } else {
-    // If no premium exercises, add another free one
-    const unusedFree = allFreeExercises.filter(ex => 
-      !selectedExercises.some(selected => selected.id === ex.id)
-    );
-    if (unusedFree.length > 0) {
-      selectedExercises.push(unusedFree[0]);
-    }
-  }
-  
-  if (premiumExercises.length > 1) {
-    selectedExercises.push(premiumExercises[1]);
-  } else {
-    // If not enough premium exercises, add another free one
-    const unusedFree = allFreeExercises.filter(ex => 
-      !selectedExercises.some(selected => selected.id === ex.id)
-    );
-    if (unusedFree.length > 0) {
-      selectedExercises.push(unusedFree[0]);
-    } else if (selectedExercises.length > 0) {
-      // If we've run out of exercises, duplicate one with a modified ID
-      selectedExercises.push({
-        ...selectedExercises[0],
-        id: `${selectedExercises[0].id}-alt`
-      });
-    }
-  }
-  
-  // Ensure we have exactly 4 exercises
-  while (selectedExercises.length < 4) {
-    if (selectedExercises.length > 0) {
-      // If we've run out of exercises, duplicate existing ones
-      const index = selectedExercises.length % selectedExercises.length;
-      selectedExercises.push({
-        ...selectedExercises[index],
-        id: `${selectedExercises[index].id}-copy-${selectedExercises.length}`
-      });
+    
+    if (premiumExercises.length > 1) {
+      selectedExercises.push(premiumExercises[1]);
     } else {
-      // Fallback to avoid infinite loop if we somehow have no exercises
-      break;
+      // If not enough premium exercises, add another free one
+      const unusedFree = allFreeExercises.filter(ex => 
+        !selectedExercises.some(selected => selected.id === ex.id)
+      );
+      if (unusedFree.length > 0) {
+        selectedExercises.push(unusedFree[0]);
+      } else if (selectedExercises.length > 0) {
+        // If we've run out of exercises, duplicate one with a modified ID
+        selectedExercises.push({
+          ...selectedExercises[0],
+          id: `${selectedExercises[0].id}-alt`
+        });
+      }
     }
+    
+    // Ensure we have exactly 4 exercises
+    while (selectedExercises.length < 4) {
+      if (selectedExercises.length > 0) {
+        // If we've run out of exercises, duplicate existing ones
+        const index = selectedExercises.length % selectedExercises.length;
+        selectedExercises.push({
+          ...selectedExercises[index],
+          id: `${selectedExercises[index].id}-copy-${selectedExercises.length}`
+        });
+      } else {
+        // Fallback to avoid infinite loop if we somehow have no exercises
+        break;
+      }
+    }
+    
+    // Return exactly 4 exercises
+    return selectedExercises.slice(0, 4);
   }
-  
-  // Return exactly 4 exercises
-  return selectedExercises.slice(0, 4);
-}
   
   function handlePainRegionSelect(regionId) {
     setSelectedPainRegion(regionId);
@@ -288,11 +372,6 @@ function getRecommendedExercises(selectedRegions) {
     );
   }
   
-  // If not authenticated, don't render anything (redirect will happen in useEffect)
-  if (!currentUser) {
-    return null;
-  }
-
   // Get the selected region data
   const selectedRegionData = painRegionData[selectedPainRegion];
   
@@ -300,244 +379,221 @@ function getRecommendedExercises(selectedRegions) {
   const userHasProStatus = isProUser(userData);
   
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Top Header */}
-      <header className="bg-white shadow-sm p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
-              <span className="text-white font-bold">1HP</span>
-            </div>
-            <span className="font-bold text-lg">1HP Troubleshooter</span>
-          </div>
-          <div className="flex items-center space-x-8">
-            <Link href="/dashboard" className="text-gray-700 hover:text-red-500">Home</Link>
-            <Link href="#" className="text-gray-700 hover:text-red-500">Talk to an Expert</Link>
-            <Link href="#" className="text-gray-700 hover:text-red-500">Addons</Link>
-            <Link href="/exercise-program" className="bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600">Today's Exercises</Link>
-            <button 
-              onClick={logout}
-              className="text-gray-700 hover:text-red-500"
+    <ProtectedPage>
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold">Current Plan</h1>
+      </header>
+      
+      {/* Pain Region Section */}
+      <div className="mb-8">
+        <h3 className="text-xl font-semibold mb-4">Pain Region</h3>
+        <div className="flex flex-wrap gap-4 mb-4">
+          {/* Only display user's available pain regions */}
+          {availablePainRegions.map(regionId => (
+            <div 
+              key={regionId}
+              className={`relative cursor-pointer ${selectedPainRegion === regionId ? 'ring-2 ring-blue-500' : ''}`}
+              onClick={() => handlePainRegionSelect(regionId)}
             >
-              Logout
-            </button>
+              {/* Using a div with background color as placeholder; replace with actual image in production */}
+              <div className="h-32 w-24 bg-gray-200 flex items-center justify-center">
+                <span className="text-xs text-center">
+                  {painRegionData[regionId].name.split(' ').map(word => (
+                    <div key={word}>{word}</div>
+                  ))}
+                </span>
+              </div>
+              <div className="absolute inset-0 bg-red-500 bg-opacity-30"></div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Selected Pain Region Names */}
+        <div>
+          {availablePainRegions.map(regionId => (
+            <p key={regionId} className="font-medium">{painRegionData[regionId].name}</p>
+          ))}
+        </div>
+        
+        {/* Health Status Bar */}
+        <div className="mt-4 mb-2">
+          <div className="relative h-6 rounded-full overflow-hidden">
+            {/* Healthbar background */}
+            <div className="absolute inset-0 bg-gray-200">
+              {/* You can add the healthbar background image here */}
+              {/* <img src="/healthbar-bg.png" alt="Health Bar" className="w-full h-full object-cover" /> */}
+            </div>
+            {/* Colored health fill */}
+            <div 
+              className="absolute top-0 left-0 h-full bg-red-500" 
+              style={{ width: `${healthScore}%` }}
+            ></div>
+            <div className="absolute inset-0 flex items-center justify-end pr-3">
+              <span className="text-white text-sm font-bold shadow-sm">
+                {Math.round(healthScore)}/100
+              </span>
+            </div>
           </div>
         </div>
-      </header>
-
-      <div className="flex flex-1">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white border-r p-6">
-          <nav className="space-y-4">
-            <Link href="/dashboard" className="block text-gray-800 font-medium hover:text-red-500">Home</Link>
-            <Link href="/about-plan" className="block text-gray-800 font-medium hover:text-red-500">About Plan</Link>
-            <Link href="/exercise-program" className="block text-gray-800 font-medium hover:text-red-500">Exercise Program</Link>
-            <Link href="/progress-statistics" className="block text-gray-800 font-medium hover:text-red-500">Progress Statistics</Link>
-            <Link href="/load-tracking" className="block text-gray-800 font-medium hover:text-red-500">Load Tracking</Link>
-            <Link href="/switch-plan" className="block text-gray-800 font-medium hover:text-red-500">Switch Plan</Link>
-            <Link href="/account" className="block text-gray-800 font-medium hover:text-red-500">Account</Link>
-            <Link href="/go-pro" className="block text-gray-800 font-medium hover:text-red-500">Go Pro</Link>
-          </nav>
-          
-          <div className="mt-8 text-sm text-blue-600">
-            <Link href="/terms" className="block hover:underline">Terms and Conditions</Link>
-            <Link href="/privacy" className="block hover:underline">Privacy Policy</Link>
-            <p className="text-gray-500 mt-1">1Healthpoint Inc. 2025</p>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 p-8 bg-gray-50">
-          <h2 className="text-2xl font-bold mb-6">Current Plan</h2>
-          
-          {/* Pain Region Section */}
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold mb-4">Pain Region</h3>
-            <div className="flex space-x-4 mb-4">
-              {/* Only display user's available pain regions */}
-              {availablePainRegions.map(regionId => (
-                <div 
-                  key={regionId}
-                  className={`relative cursor-pointer ${selectedPainRegion === regionId ? 'ring-2 ring-blue-500' : ''}`}
-                  onClick={() => handlePainRegionSelect(regionId)}
-                >
-                  {/* Using a div with background color as placeholder; replace with actual image in production */}
-                  <div className="h-32 w-24 bg-gray-200 flex items-center justify-center">
-                    <span className="text-xs text-center">
-                      {painRegionData[regionId].name.split(' ').map(word => (
-                        <div key={word}>{word}</div>
-                      ))}
-                    </span>
-                  </div>
-                  <div className="absolute inset-0 bg-red-500 bg-opacity-30"></div>
-                </div>
-              ))}
-            </div>
-            
-            {/* Selected Pain Region Names */}
-            <div>
-              {availablePainRegions.map(regionId => (
-                <p key={regionId} className="font-medium">{painRegionData[regionId].name}</p>
-              ))}
-            </div>
-            
-            {/* Health Status Bar */}
-            <div className="mt-4 mb-2">
-              <div className="relative h-6 rounded-full overflow-hidden">
-                {/* Healthbar background */}
-                <div className="absolute inset-0">
-                  {/* You can add the healthbar background image here */}
-                  {/* <Image src="/healthbar-bg.png" alt="Health Bar" layout="fill" objectFit="cover" /> */}
-                </div>
-                {/* Colored health fill */}
-                <div 
-                  className="absolute top-0 left-0 h-full bg-red-500" 
-                  style={{ width: `${healthScore}%` }}
-                ></div>
-                <div className="absolute inset-0 flex items-center justify-end pr-3">
-                  <span className="text-white text-sm font-bold shadow-sm">
-                    {Math.round(healthScore)}/100
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Problem Overview */}
-          <div className="mb-8">
-            <h3 className="text-xl font-bold mb-2">Problem Overview</h3>
-            <p className="text-gray-700">
-              {selectedRegionData?.description || "Please select a pain region."}
-            </p>
-          </div>
-          
-          {/* Exercise Program */}
-          <div className="mb-8">
-            <h3 className="text-xl font-bold mb-4">Exercise Program</h3>
-            <div className="flex flex-wrap gap-4 mb-4">
-              {/* Show first 2 exercises normally for all users */}
-              {recommendedExercises.slice(0, 2).map((exercise, index) => (
-                <div key={`${exercise.id}-${index}`} className="bg-gray-100 p-4 rounded-lg w-40">
-                  <div className="bg-gray-300 w-full h-32 mb-2 rounded-lg flex items-center justify-center">
-                    <span className="text-gray-500">Exercise Image</span>
-                  </div>
-                  <p className="text-center text-sm">{exercise.name}</p>
-                </div>
-              ))}
-              
-              {/* For non-pro users, show locked exercises */}
-              {!userHasProStatus && recommendedExercises.slice(2, 4).map((exercise, index) => (
-                <div key={`${exercise.id}-locked-${index}`} className="bg-gray-100 p-4 rounded-lg w-40 relative">
-                  {/* Locked overlay */}
-                  <div className="absolute inset-0 bg-gray-600 bg-opacity-75 flex flex-col items-center justify-center z-10 rounded-lg">
-                    <div className="bg-red-500 rounded-full p-2 mb-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                    </div>
-                    <p className="text-white text-xs text-center px-2">Upgrade to Pro to unlock</p>
-                  </div>
-                  
-                  {/* Exercise content (blurred) */}
-                  <div className="blur-sm">
-                    <div className="bg-gray-300 w-full h-32 mb-2 rounded-lg flex items-center justify-center">
-                      <span className="text-gray-500">Exercise Image</span>
-                    </div>
-                    <p className="text-center text-sm">{exercise.name}</p>
-                  </div>
-                </div>
-              ))}
-              
-              {/* For pro users, show all exercises normally */}
-              {userHasProStatus && recommendedExercises.slice(2, 4).map((exercise, index) => (
-                <div key={`${exercise.id}-pro-${index}`} className="bg-gray-100 p-4 rounded-lg w-40">
-                  <div className="bg-gray-300 w-full h-32 mb-2 rounded-lg flex items-center justify-center">
-                    <span className="text-gray-500">Exercise Image</span>
-                  </div>
-                  <p className="text-center text-sm">{exercise.name}</p>
-                </div>
-              ))}
-              
-              <div className="flex items-center">
-                <Link href="/exercise-program" className="text-blue-600 font-medium flex items-center">
-                  See More
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              </div>
-            </div>
-          </div>
-          
-          {/* Your Attributes */}
-          <div>
-            {isProUser(userData) ? (
-              // Pro User View: Full Quick Stats
-              <QuickStats userData={userData} />
-            ) : (
-              // Free User View: Limited Stats with Upgrade Prompts
-              <div>
-                <h3 className="text-xl font-bold mb-4">Your Attributes</h3>
-                <div className="flex flex-wrap gap-4">
-                  {/* Wrist Flexor Endurance - Free stat */}
-                  <div className="bg-white p-4 rounded-lg shadow w-48">
-                    <h4 className="font-medium text-gray-800 mb-2">Wrist Flexor Endurance</h4>
-                    <p className="text-xl font-bold">
-                      {userData?.wristFlexorEndurance?.weight || 6} Lbs
-                    </p>
-                    <p className="text-xl font-bold">
-                      {userData?.wristFlexorEndurance?.repMax || 40} Rep Max
-                    </p>
-                    <p className={(userData?.wristFlexorEndurance?.percentChange || 8) > 0 ? "text-green-500" : "text-red-500"}>
-                      {(userData?.wristFlexorEndurance?.percentChange || 8) > 0 ? "+" : ""}
-                      {userData?.wristFlexorEndurance?.percentChange || 8}% from last week
-                    </p>
-                  </div>
-                  
-                  {/* Average Activity Time - Locked Premium Feature */}
-                  <div className="bg-white p-4 rounded-lg shadow w-48">
-                    <h4 className="font-medium text-gray-800 mb-2">Average Activity Time</h4>
-                    <div className="flex justify-center my-4">
-                      <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <Link href="/go-pro" className="bg-red-500 text-white px-4 py-1 rounded-full text-sm hover:bg-red-600">Unlock</Link>
-                    </div>
-                  </div>
-                  
-                  {/* Pain Level Stats - Locked Premium Feature */}
-                  <div className="bg-white p-4 rounded-lg shadow w-48">
-                    <h4 className="font-medium text-gray-800 mb-2">Pain Level Analytics</h4>
-                    <div className="flex justify-center my-4">
-                      <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <Link href="/go-pro" className="bg-red-500 text-white px-4 py-1 rounded-full text-sm hover:bg-red-600">Unlock</Link>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <Link href="/progress-statistics" className="text-blue-600 font-medium flex items-center">
-                      See More
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </main>
       </div>
-    </div>
+      
+      {/* Problem Overview */}
+      <div className="mb-8">
+        <h3 className="text-xl font-bold mb-2">Problem Overview</h3>
+        <p className="text-gray-700">
+          {selectedRegionData?.description || "Please select a pain region."}
+        </p>
+      </div>
+      
+      {/* Exercise Program */}
+      <div className="mb-8">
+        <h3 className="text-xl font-bold mb-4">Exercise Program</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-4">
+          {/* Show first 2 exercises normally for all users */}
+          {recommendedExercises.slice(0, 2).map((exercise, index) => (
+            <div key={`${exercise.id}-${index}`} className="bg-white p-2 rounded mb-2">
+              <div className="w-full h-36 mb-1 overflow-hidden">
+                {exercise.imageUrl ? (
+                  <img 
+                    src={exercise.imageUrl}
+                    alt={exercise.name.replace(/\*/g, '')}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <span className="text-gray-500">Exercise Image</span>
+                )}
+              </div>
+              <p className="text-center text-red-500 font-normal">{exercise.name.replace(/\*/g, '')}</p>
+            </div>
+          ))}
+          
+          {/* For non-pro users, show locked exercises */}
+          {!userHasProStatus && recommendedExercises.slice(2, 4).map((exercise, index) => (
+            <div key={`${exercise.id}-locked-${index}`} className="bg-white p-2 rounded mb-2 relative">
+              {/* Locked overlay */}
+              <div className="absolute inset-0 bg-gray-600 bg-opacity-75 flex flex-col items-center justify-center z-10 rounded">
+                <div className="bg-red-500 rounded-full p-2 mb-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <p className="text-white text-xs text-center px-2">Upgrade to Pro to unlock</p>
+              </div>
+              
+              {/* Exercise content (blurred) */}
+              <div className="blur-sm">
+                <div className="w-full h-36 mb-1 overflow-hidden">
+                  {exercise.imageUrl ? (
+                    <img 
+                      src={exercise.imageUrl}
+                      alt={exercise.name.replace(/\*/g, '')}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <span className="text-gray-500">Exercise Image</span>
+                  )}
+                </div>
+                <p className="text-center text-red-500 font-normal">{exercise.name.replace(/\*/g, '')}</p>
+              </div>
+            </div>
+          ))}
+          
+          {/* For pro users, show all exercises normally */}
+          {userHasProStatus && recommendedExercises.slice(2, 4).map((exercise, index) => (
+            <div key={`${exercise.id}-pro-${index}`} className="bg-white p-2 rounded mb-2">
+              <div className="w-full h-36 mb-1 overflow-hidden">
+                {exercise.imageUrl ? (
+                  <img 
+                    src={exercise.imageUrl}
+                    alt={exercise.name.replace(/\*/g, '')}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <span className="text-gray-500">Exercise Image</span>
+                )}
+              </div>
+              <p className="text-center text-red-500 font-normal">{exercise.name.replace(/\*/g, '')}</p>
+            </div>
+          ))}
+        </div>
+        
+        <div className="flex items-center">
+          <Link href="/exercise-program" className="text-red-500 font-medium flex items-center">
+            See More
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
+      </div>
+      
+      {/* Your Attributes */}
+      <div>
+        {isProUser(userData) ? (
+          // Pro User View: Full Quick Stats
+          <QuickStats userData={userData} />
+        ) : (
+          // Free User View: Limited Stats with Upgrade Prompts
+          <div>
+            <h3 className="text-xl font-bold mb-4">Your Attributes</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
+              {/* Wrist Flexor Endurance - Free stat */}
+              <div className="bg-white p-4 border-b border-r">
+                <h4 className="font-medium text-gray-800 mb-2">Wrist Flexor Endurance</h4>
+                <p className="text-xl font-bold">
+                  {userData?.wristFlexorEndurance?.weight || 6} Lbs
+                </p>
+                <p className="text-xl font-bold">
+                  {userData?.wristFlexorEndurance?.repMax || 40} Rep Max
+                </p>
+                <p className={(userData?.wristFlexorEndurance?.percentChange || 8) > 0 ? "text-green-500" : "text-red-500"}>
+                  {(userData?.wristFlexorEndurance?.percentChange || 8) > 0 ? "+" : ""}
+                  {userData?.wristFlexorEndurance?.percentChange || 8}% from last week
+                </p>
+              </div>
+              
+              {/* Average Activity Time - Locked Premium Feature */}
+              <div className="bg-white p-4 border-b border-r">
+                <h4 className="font-medium text-gray-800 mb-2">Average Activity Time</h4>
+                <div className="flex justify-center my-4">
+                  <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <Link href="/go-pro" className="bg-red-500 text-white px-4 py-1 rounded-full text-sm hover:bg-red-600">Unlock</Link>
+                </div>
+              </div>
+              
+              {/* Pain Level Stats - Locked Premium Feature */}
+              <div className="bg-white p-4 border-b">
+                <h4 className="font-medium text-gray-800 mb-2">Pain Level Analytics</h4>
+                <div className="flex justify-center my-4">
+                  <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <Link href="/go-pro" className="bg-red-500 text-white px-4 py-1 rounded-full text-sm hover:bg-red-600">Unlock</Link>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4">
+              <Link href="/progress-statistics" className="text-red-500 font-medium flex items-center">
+                See More
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+    </ProtectedPage>
   );
 }
