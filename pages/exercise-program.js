@@ -120,9 +120,9 @@ function getRecommendedExercises(selectedPainRegions, nerveTestResults, userHasP
   
   // Limit the number of exercises per category for a balanced program
   return {
-    stretches: result.stretches.slice(0, 3),
-    isometrics: result.isometrics.slice(0, 2),
-    strength: result.strength.slice(0, 3),
+    stretches: result.stretches.slice(0, 20),
+    isometrics: result.isometrics.slice(0, 20),
+    strength: result.strength.slice(0, 20),
     neural: result.neural || []
   };
 }

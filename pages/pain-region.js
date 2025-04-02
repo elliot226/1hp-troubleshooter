@@ -1,6 +1,7 @@
 // pages/pain-region.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { getDoc, setDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -180,30 +181,52 @@ export default function PainRegion() {
       onBack={handleBack}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {painRegions.map((region) => (
             <div 
               key={region.id}
-              className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
+              className={`border-2 rounded-lg p-4 cursor-pointer transition-colors overflow-hidden ${
                 selectedRegions[region.id] 
                   ? 'border-red-500 bg-red-50' 
                   : 'border-gray-200 hover:border-red-200'
               }`}
               onClick={() => handleRegionChange(region.id)}
             >
-              <div className="flex items-center">
-                <input 
-                  type="checkbox" 
-                  id={region.id}
-                  checked={selectedRegions[region.id] || false}
-                  onChange={() => handleRegionChange(region.id)}
-                  className="w-5 h-5 text-red-500 mr-3"
-                />
-                <label htmlFor={region.id} className="font-medium cursor-pointer">
-                  {region.label}
-                </label>
+              <div className="flex items-center mb-3">
+                <div className="absolute left-6">
+                  <input 
+                    type="checkbox" 
+                    id={region.id}
+                    checked={selectedRegions[region.id] || false}
+                    onChange={() => handleRegionChange(region.id)}
+                    className="w-5 h-5 text-blue-500"
+                  />
+                </div>
+                <div className="w-full text-center">
+                  <label htmlFor={region.id} className="font-medium text-lg cursor-pointer">
+                    {region.label}
+                  </label>
+                </div>
               </div>
-              <p className="mt-2 text-sm text-gray-600 ml-8">
+              
+              {/* Centered large image */}
+              <div className="flex justify-center mb-3">
+                <div className="relative h-48 w-40">
+                  <Image
+                    src={`/images/pain-regions/${region.id}.png`}
+                    alt={`${region.label} pain region`}
+                    fill
+                    objectFit="contain"
+                    className={`transition-opacity duration-300 ${
+                      selectedRegions[region.id] ? 'opacity-100' : 'opacity-80'
+                    }`}
+                    priority
+                  />
+                </div>
+              </div>
+              
+              {/* Description below the image */}
+              <p className="text-sm text-gray-600 text-center">
                 {region.description}
               </p>
             </div>

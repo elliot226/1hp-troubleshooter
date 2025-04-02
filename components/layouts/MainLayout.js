@@ -75,7 +75,7 @@ export default function MainLayout({ children }) {
                   href="/dashboard"
                   className={`block py-1 text-black ${router.pathname === '/dashboard' ? 'font-bold text-red-500' : 'hover:text-red-500'}`}
                 >
-                  Home
+                  Dashboard
                 </Link>
               </li>
               <li>
