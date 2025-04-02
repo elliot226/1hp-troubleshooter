@@ -825,8 +825,6 @@ export default function ExerciseProgram() {
                   targetRepMax: exercise.targetReps?.max || 20
                 };
                 
-                const imagePath = `/images/exercises/${exercise.id.toLowerCase()}.jpg`;
-                
                 return (
                   <div 
                     key={exercise.id}
@@ -835,12 +833,12 @@ export default function ExerciseProgram() {
                     } relative`}
                     onClick={() => canAccessExercise(exercise) && openExerciseDetail(exercise, 'stretches', index)}
                   >
-                    {/* Exercise Image */}
+                    {/* Exercise Image - Using imageUrl directly */}
                     <div className="h-48 w-full bg-gray-100">
                       <img 
-                        src={imagePath} 
+                        src={exercise.imageUrl} 
                         alt={exercise.name} 
-                        className="w-full h-full object-cover object-center"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
                           e.target.onerror = null;
                           e.target.src = "/images/exercises/placeholder.jpg";
@@ -912,8 +910,6 @@ export default function ExerciseProgram() {
                   targetRepMax: exercise.targetReps?.max || 20
                 };
                 
-                const imagePath = `/images/exercises/${exercise.id.toLowerCase()}.jpg`;
-                
                 return (
                   <div 
                     key={exercise.id}
@@ -922,12 +918,12 @@ export default function ExerciseProgram() {
                     } relative`}
                     onClick={() => canAccessExercise(exercise) && openExerciseDetail(exercise, 'isometrics', index)}
                   >
-                    {/* Exercise Image */}
+                    {/* Exercise Image - Using imageUrl directly */}
                     <div className="h-48 w-full bg-gray-100">
                       <img 
-                        src={imagePath} 
+                        src={exercise.imageUrl} 
                         alt={exercise.name} 
-                        className="w-full h-full object-cover object-center"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
                           e.target.onerror = null;
                           e.target.src = "/images/exercises/placeholder.jpg";
@@ -1000,8 +996,6 @@ export default function ExerciseProgram() {
                   targetRepMax: exercise.targetReps?.max || 20
                 };
                 
-                const imagePath = `/images/exercises/${exercise.id.toLowerCase()}.jpg`;
-                
                 return (
                   <div 
                     key={exercise.id}
@@ -1010,12 +1004,12 @@ export default function ExerciseProgram() {
                     } relative`}
                     onClick={() => canAccessExercise(exercise) && openExerciseDetail(exercise, 'strength', index)}
                   >
-                    {/* Exercise Image */}
+                    {/* Exercise Image - Using imageUrl directly */}
                     <div className="h-48 w-full bg-gray-100">
                       <img 
-                        src={imagePath} 
+                        src={exercise.imageUrl} 
                         alt={exercise.name} 
-                        className="w-full h-full object-cover object-center"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
                           e.target.onerror = null;
                           e.target.src = "/images/exercises/placeholder.jpg";
@@ -1085,8 +1079,6 @@ export default function ExerciseProgram() {
             <h2 className="text-xl font-semibold mb-4">Neural Mobility Exercises</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {exercises.neural.map((exercise, index) => {
-                const imagePath = `/images/exercises/${exercise.id.toLowerCase()}.jpg`;
-                
                 return (
                   <div 
                     key={exercise.id}
@@ -1095,12 +1087,12 @@ export default function ExerciseProgram() {
                     } relative`}
                     onClick={() => canAccessExercise(exercise) && openExerciseDetail(exercise, 'neural', index)}
                   >
-                    {/* Exercise Image */}
+                    {/* Exercise Image - Using imageUrl directly */}
                     <div className="h-48 w-full bg-gray-100">
                       <img 
-                        src={imagePath} 
+                        src={exercise.imageUrl} 
                         alt={exercise.name} 
-                        className="w-full h-full object-cover object-center"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
                           e.target.onerror = null;
                           e.target.src = "/images/exercises/placeholder.jpg";
@@ -1201,10 +1193,10 @@ export default function ExerciseProgram() {
                 </button>
               </div>
               
-              {/* Exercise Video/Image Placeholder */}
+              {/* Exercise Video/Image - Using imageUrl directly */}
               <div className="bg-gray-200 h-64 rounded-lg mb-4 flex items-center justify-center relative">
                 <img 
-                  src={`/images/exercises/${selectedExercise.id.toLowerCase()}.jpg`} 
+                  src={selectedExercise.imageUrl} 
                   alt={selectedExercise.name}
                   className="w-full h-full object-contain"
                   onError={(e) => {
