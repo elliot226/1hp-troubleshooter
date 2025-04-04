@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserData } from '@/lib/firestoreUtils';
 import ProtectedPage from '@/components/layouts/ProtectedPage';
+import EnhancedAnatomySection from '@/components/EnhancedAnatomySection';
 
 // Pain region data with descriptions and anatomy information
 const painRegionData = {
@@ -339,48 +340,10 @@ export default function AboutPlan() {
         </div>
       </div>
 
-      {/* What Structures Are Involved */}
-      {selectedRegionData && (
-        <div className="mb-10">
-          <h2 className="text-xl font-bold mb-4">What Structures Are Involved</h2>
-          <div className="border border-gray-300 rounded-lg overflow-hidden">
-            <div className="grid grid-cols-1 md:grid-cols-2">
-              <div className="bg-red-200 p-8 flex flex-col items-center justify-center text-center">
-                <h3 className="text-2xl font-bold mb-1">{selectedRegionData.structure.name}</h3>
-                <p className="text-xl mb-8">{selectedRegionData.structure.type}</p>
-                <p className="text-xl font-bold">
-                  Actions: {selectedRegionData.structure.actions}
-                </p>
-              </div>
-              
-              <div className="bg-white p-4 flex items-center justify-center">
-                {selectedRegionData.anatomyImage ? (
-                  <div className="relative w-60 h-80">
-                    <Image
-                      src={selectedRegionData.anatomyImage}
-                      alt={`${selectedRegionData.name} anatomy`}
-                      fill
-                      className="object-contain"
-                    />
-                    {/* Play Button Overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="bg-black bg-opacity-20 rounded-full p-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-60 h-80 bg-gray-200 flex items-center justify-center">
-                    <span className="text-gray-500">Anatomy Image</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* What Structures Are Involved - Enhanced Section */}
+{selectedRegionData && (
+  <EnhancedAnatomySection selectedRegion={selectedRegion} />
+)}
 
       {/* Problem Overview */}
       {selectedRegionData && (

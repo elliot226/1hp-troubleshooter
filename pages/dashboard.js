@@ -315,7 +315,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-4">
           {/* Show first 2 exercises normally for all users */}
           {recommendedExercises.slice(0, userHasProStatus ? 4 : 2).map((exercise, index) => (
-            <div key={`${exercise.id}-${index}`} className="bg-white p-2 rounded mb-2">
+            <div key={`${exercise.id}-${index}`} className="bg-white p-2 shadow-sm border-a rounded mb-2">
               <div className="w-full h-36 mb-1 overflow-hidden">
                 {exercise.imageUrl ? (
                   <img 
