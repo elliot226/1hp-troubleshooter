@@ -1,7 +1,7 @@
-// pages/dashboard.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserData } from '@/lib/firestoreUtils';
 import { hasCompletedAssessment, isProUser } from '@/lib/userUtils';
@@ -20,42 +20,42 @@ const painRegionData = {
   wristExtensors: {
     name: "Wrist / Hand Extensors",
     description: "Pain on the back side of the wrist is often related to irritation of the wrist extensor tendons. These muscles and tendons are responsible for lifting up the finger and wrist each time a new button is pressed or action is completed. Whether that is clicking the mouse/keyboard, using your finger to hit a controller trigger, or tapping something on the mobile device. Click about plan to learn more",
-    image: "/wrist-extensors.jpg"
+    image: "/images/pain-regions/wristExtensors.png"
   },
   thumbExtensors: {
     name: "Thumb Extensors",
     description: "Pain in the thumb extensor tendons can occur from excessive typing, gaming, or mobile device use. These tendons help you lift and extend your thumb away from your palm. Often irritated from repetitive button pressing or touchscreen use, this area requires specific targeted exercises to build resilience.",
-    image: "/thumb-extensors.jpg"
+    image: "/images/pain-regions/thumbExtensors.png"
   },
   wristFlexors: {
     name: "Wrist Flexors",
     description: "This is one of the most commonly reported pain patterns for RSI is palm-side wrist pain. This area is commonly injured due to the stress and strain put on the finger flexors. This typically is irritation of just one or multiple tendons that cross the wrist and leads to the tips of the fingers. These muscles/tendons are responsible for gripping actions and are used constantly during gaming or typing.",
-    image: "/wrist-flexors.jpg"
+    image: "/images/pain-regions/wristFlexors.png"
   },
   fingers: {
     name: "Fingers",
     description: "Pain in multiple fingers may indicate irritation in several different tendons or a more systemic issue. The finger extensors and flexors work together to control precise finger movements needed for typing, gaming, and other repetitive tasks. This requires a comprehensive approach to address all affected areas.",
-    image: "/fingers.jpg"
+    image: "/images/pain-regions/fingers.png"
   },
   ulnarSideExtensors: {
     name: "Ulnar Side Extensors",
     description: "Pain along the ulnar (pinky) side of the forearm on the back side is often related to the muscles that extend the wrist and move it toward the pinky side. This area can be irritated from repetitive typing or gaming that involves frequent ulnar deviation of the wrist.",
-    image: "/ulnar-extensors.jpg"
+    image: "/images/pain-regions/ulnarSideExtensors.png"
   },
   ulnarSideFlexors: {
     name: "Ulnar Side Flexors",
     description: "Pain along the ulnar (pinky) side of the forearm on the palm side relates to the flexor muscles that bend the wrist and move it toward the pinky side. These muscles can become irritated from activities requiring strong grip combined with wrist movement.",
-    image: "/ulnar-flexors.jpg"
+    image: "/images/pain-regions/ulnarSideFlexors.png"
   },
   pinkyFlexors: {
     name: "Pinky Flexors",
     description: "Pain in the muscles controlling the pinky finger can occur from repetitive gripping or typing activities. The pinky is often used for reaching for modifier keys on a keyboard, which can strain these smaller, more specialized muscles.",
-    image: "/pinky-flexors.jpg"
+    image: "/images/pain-regions/pinkyFlexors.png"
   },
   thumbFlexors: {
     name: "Thumb Flexors",
     description: "Pain in the thumb flexors occurs in the muscles that bend the thumb inward toward the palm. These muscles are heavily used in gripping, typing, and especially in mobile device usage where the thumbs do most of the work.",
-    image: "/thumb-flexors.jpg"
+    image: "/images/pain-regions/thumbFlexors.png"
   }
 };
 
@@ -251,22 +251,23 @@ export default function Dashboard() {
       <div className="mb-8">
         <h3 className="text-xl font-semibold mb-4">Pain Region</h3>
         <div className="flex flex-wrap gap-4 mb-4">
-          {/* Only display user's available pain regions */}
+          {/* Display user's available pain regions with proper images */}
           {availablePainRegions.map(regionId => (
             <div 
               key={regionId}
               className={`relative cursor-pointer ${selectedPainRegion === regionId ? 'ring-2 ring-blue-500' : ''}`}
               onClick={() => handlePainRegionSelect(regionId)}
             >
-              {/* Using a div with background color as placeholder; replace with actual image in production */}
-              <div className="h-32 w-24 bg-gray-200 flex items-center justify-center">
-                <span className="text-xs text-center">
-                  {painRegionData[regionId].name.split(' ').map(word => (
-                    <div key={word}>{word}</div>
-                  ))}
-                </span>
+              <div className="h-32 w-24 bg-white-100 relative overflow-hidden">
+                <Image 
+                  src={painRegionData[regionId].image}
+                  alt={painRegionData[regionId].name}
+                  fill
+                  style={{ objectFit: 'contain' }}
+                />
               </div>
-              <div className="absolute inset-0 bg-red-500 bg-opacity-30"></div>
+              {/* Colored overlay to indicate pain region */}
+              
             </div>
           ))}
         </div>
