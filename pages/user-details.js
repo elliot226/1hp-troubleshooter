@@ -127,7 +127,7 @@ export default function UserDetails() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Full Name
+            Name
           </label>
           <input
             type="text"

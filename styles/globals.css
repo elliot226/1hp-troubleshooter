@@ -46,13 +46,9 @@ body {
   background-color: #f5f5f5;
 }
 
+/* Remove default link styling - let each component define its own colors */
 a {
-  color: var(--primary-color);
   text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
 }
 
 /* Container for most pages */

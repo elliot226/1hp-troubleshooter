@@ -41,9 +41,9 @@ export default function MainLayout({ children }) {
 
           {/* Navigation Links */}
           <div className="flex items-center space-x-4 md:space-x-8">
-            <Link href="/dashboard" className="text-black hover:text-red-500 hidden md:block">Home</Link>
-            <Link href="/talk-to-expert" className="text-black hover:text-red-500 hidden md:block">Talk to an Expert</Link>
-            <Link href="/addons" className="text-black hover:text-red-500 hidden md:block">Addons</Link>
+            <Link href="/dashboard" className="text-black hover:text-black-500 hidden md:block">Home</Link>
+            <Link href="/talk-to-expert" className="text-black hover:text-black-500 hidden md:block">Talk to an Expert</Link>
+            <Link href="/addons" className="text-black hover:text-black-500 hidden md:block">Addons</Link>
             <button
               onClick={handleLogout}
               className="text-black hover:text-red-500"
@@ -73,7 +73,7 @@ export default function MainLayout({ children }) {
               <li>
                 <Link
                   href="/dashboard"
-                  className={`block py-1 text-black ${router.pathname === '/dashboard' ? 'font-bold text-red-500' : 'hover:text-red-500'}`}
+                  className={`block py-1 text-black ${router.pathname === '/dashboard' ? 'font-bold text-black-500' : 'hover:text-red-500'}`}
                 >
                   Dashboard
                 </Link>
@@ -81,7 +81,7 @@ export default function MainLayout({ children }) {
               <li>
                 <Link
                   href="/about-plan"
-                  className={`block py-1 text-black ${router.pathname === '/about-plan' ? 'font-bold text-red-500' : 'hover:text-red-500'}`}
+                  className={`block py-1 text-black ${router.pathname === '/about-plan' ? 'font-bold text-black-500' : 'hover:text-red-500'}`}
                 >
                   About Plan
                 </Link>
@@ -89,7 +89,7 @@ export default function MainLayout({ children }) {
               <li>
                 <Link
                   href="/exercise-program"
-                  className={`block py-1 text-black ${router.pathname === '/exercise-program' ? 'font-bold text-red-500' : 'hover:text-red-500'}`}
+                  className={`block py-1 text-black ${router.pathname === '/exercise-program' ? 'font-bold text-black-500' : 'hover:text-red-500'}`}
                 >
                   Exercise Program
                 </Link>
@@ -97,7 +97,7 @@ export default function MainLayout({ children }) {
               <li>
                 <Link
                   href="/progress-statistics"
-                  className={`block py-1 text-black ${router.pathname === '/progress-statistics' ? 'font-bold text-red-500' : 'hover:text-red-500'}`}
+                  className={`block py-1 text-black ${router.pathname === '/progress-statistics' ? 'font-bold text-black-500' : 'hover:text-red-500'}`}
                 >
                   Progress Statistics
                 </Link>
@@ -105,7 +105,7 @@ export default function MainLayout({ children }) {
               <li>
                 <Link
                   href="/load-tracking"
-                  className={`block py-1 text-black ${router.pathname === '/load-tracking' ? 'font-bold text-red-500' : 'hover:text-red-500'}`}
+                  className={`block py-1 text-black ${router.pathname === '/load-tracking' ? 'font-bold text-black-500' : 'hover:text-red-500'}`}
                 >
                   Load Tracking
                 </Link>
@@ -113,7 +113,7 @@ export default function MainLayout({ children }) {
               <li>
                 <Link
                   href="/switch-plan"
-                  className={`block py-1 text-black ${router.pathname === '/switch-plan' ? 'font-bold text-red-500' : 'hover:text-red-500'}`}
+                  className={`block py-1 text-black ${router.pathname === '/switch-plan' ? 'font-bold text-black-500' : 'hover:text-red-500'}`}
                 >
                   Switch Plan
                 </Link>
@@ -121,7 +121,7 @@ export default function MainLayout({ children }) {
               <li>
                 <Link
                   href="/account"
-                  className={`block py-1 text-black ${router.pathname === '/account' ? 'font-bold text-red-500' : 'hover:text-red-500'}`}
+                  className={`block py-1 text-black ${router.pathname === '/account' ? 'font-bold text-black-500' : 'hover:text-red-500'}`}
                 >
                   Account
                 </Link>
@@ -129,7 +129,7 @@ export default function MainLayout({ children }) {
               <li>
                 <Link
                   href="/go-pro"
-                  className={`block py-1 text-black ${router.pathname === '/go-pro' ? 'font-bold text-red-500' : 'hover:text-red-500'}`}
+                  className={`block py-1 text-black ${router.pathname === '/go-pro' ? 'font-bold text-black-500' : 'hover:text-red-500'}`}
                 >
                   Go Pro
                 </Link>
