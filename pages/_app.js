@@ -5,6 +5,7 @@ import '@/styles/globals.css';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { hasCompletedAssessment } from '@/lib/userUtils';
+import EmbedLayout from '@/components/EmbedLayout';
 
 // Public routes that don't need authentication
 const publicRoutes = ['/', '/login', '/signup'];
@@ -60,5 +61,6 @@ function AuthWrapper({ children }) {
   // For public routes, render normally
   return <>{children}</>;
 }
+
 
 export default MyApp;
