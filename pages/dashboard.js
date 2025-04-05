@@ -11,7 +11,8 @@ import {
   exerciseLibrary, 
   exercisesByPainRegion, 
   getExercisesForMultiplePainRegions,
-  painRegionToTestMapping
+  painRegionToTestMapping,
+  isExerciseFreeForUser
 } from '@/lib/exerciseData';
 import { getExercisePrescription } from '@/lib/exercisePrescriptionUtils';
 
@@ -133,15 +134,14 @@ export default function Dashboard() {
     loadUserData();
   }, [currentUser, router]);
   
-  // Function to get recommended exercises based on pain regions
   function getRecommendedExercises(selectedRegions, userHasProAccess) {
     // Get all exercises for the selected pain regions
     const allExercises = getExercisesForMultiplePainRegions(selectedRegions);
     
-    // Filter exercises for free users
-    const accessibleExercises = userHasProAccess 
-      ? allExercises 
-      : allExercises.filter(ex => ex.isFree);
+    // Filter exercises based on access
+    const accessibleExercises = allExercises.filter(exercise => 
+      userHasProAccess || isExerciseFreeForUser(exercise.id, selectedRegions)
+    );
     
     // Ensure we have a good mix by separating the exercises by type
     const stretches = accessibleExercises.filter(ex => ex.category === 'stretches');
@@ -178,7 +178,10 @@ export default function Dashboard() {
     
     // If we still don't have 4, fill with locked premium exercises for free users
     if (!userHasProAccess && selectedExercises.length < 4) {
-      const premiumExercises = allExercises.filter(ex => !ex.isFree);
+      // Find premium exercises (ones that aren't free for this user)
+      const premiumExercises = allExercises.filter(ex => 
+        !isExerciseFreeForUser(ex.id, selectedRegions)
+      );
       
       for (let i = 0; i < premiumExercises.length && selectedExercises.length < 4; i++) {
         selectedExercises.push(premiumExercises[i]);
@@ -187,6 +190,20 @@ export default function Dashboard() {
     
     // Return exactly 4 exercises or as many as available if less than 4
     return selectedExercises.slice(0, 4);
+  }
+  
+  // Replace canAccessExercise function
+  function canAccessExercise(exercise) {
+    // Pro users can access all exercises
+    if (isProUser(userData)) {
+      return true;
+    }
+    
+    // Get user's selected pain regions
+    const userPainRegions = availablePainRegions || [];
+    
+    // For free users, check if the exercise is free for their pain regions
+    return isExerciseFreeForUser(exercise.id, userPainRegions);
   }
   
   // Function to convert weight between units

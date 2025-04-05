@@ -10,7 +10,8 @@ import ProtectedPage from '@/components/layouts/ProtectedPage';
 import { 
   exerciseLibrary, 
   exercisesByCategory,
-  getNeuralMobilityExercise 
+  getNeuralMobilityExercise,
+  isExerciseFreeForUser 
 } from '@/lib/exerciseData';
 import { 
   getExercisePrescription, 
@@ -65,11 +66,13 @@ function getRecommendedExercises(selectedPainRegions, nerveTestResults, userHasP
   // Process each pain region and add exercises
   selectedPainRegions.forEach(regionId => {
     Object.values(exerciseLibrary).forEach(exercise => {
-      // Skip if exercise is already in the set or is premium for free users
-      if (
-        exerciseSet.has(exercise.id) || 
-        (!userHasProAccess && !exercise.isFree)
-      ) {
+      // Skip if exercise is already in the set
+      if (exerciseSet.has(exercise.id)) {
+        return;
+      }
+      
+      // Skip if not pro user and exercise isn't free for this pain region
+      if (!userHasProAccess && !isExerciseFreeForUser(exercise.id, selectedPainRegions)) {
         return;
       }
       
@@ -107,7 +110,9 @@ function getRecommendedExercises(selectedPainRegions, nerveTestResults, userHasP
       if (testResult && testResult !== 'none') {
         const exercise = getNeuralMobilityExercise(nerveType, testResult);
         
-        if (exercise && (userHasProAccess || exercise.isFree) && !exerciseSet.has(exercise.id)) {
+        if (exercise && 
+            (userHasProAccess || isExerciseFreeForUser(exercise.id, selectedPainRegions)) && 
+            !exerciseSet.has(exercise.id)) {
           result.neural.push({
             ...exercise,
             completedAM: false,
@@ -127,6 +132,22 @@ function getRecommendedExercises(selectedPainRegions, nerveTestResults, userHasP
     strength: result.strength.slice(0, 20),
     neural: result.neural || []
   };
+}
+
+// Replace canAccessExercise function
+function canAccessExercise(exercise) {
+  // Pro users can access all exercises
+  if (isProUser(userData)) {
+    return true;
+  }
+  
+  // Get user's selected pain regions
+  const userPainRegions = userData?.painRegions ? 
+    Object.keys(userData.painRegions).filter(key => userData.painRegions[key]) : 
+    [];
+  
+  // For free users, check if the exercise is free for their pain regions
+  return isExerciseFreeForUser(exercise.id, userPainRegions);
 }
 
 export default function ExerciseProgram() {
