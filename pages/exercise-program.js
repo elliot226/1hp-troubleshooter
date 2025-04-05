@@ -164,6 +164,7 @@ export default function ExerciseProgram() {
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [dateLoading, setDateLoading] = useState(false);
   const [weightUnit, setWeightUnit] = useState('lbs');
+  const [quickCompleteLoading, setQuickCompleteLoading] = useState(false);
 
   // Add refreshPrescriptions function
   async function refreshPrescriptions() {
@@ -532,6 +533,8 @@ export default function ExerciseProgram() {
 
   // Quick complete all exercises for the current time of day
   async function quickComplete() {
+    setQuickCompleteLoading(true);
+    
     // First update the UI
     setExercises(prev => {
       const updated = {};
@@ -583,7 +586,74 @@ export default function ExerciseProgram() {
         await Promise.all(promises);
       } catch (error) {
         console.error("Error during quick complete:", error);
+      } finally {
+        setQuickCompleteLoading(false);
       }
+    } else {
+      setQuickCompleteLoading(false);
+    }
+  }
+
+  // NEW FUNCTION: Undo quick complete for the current time of day
+  async function undoQuickComplete() {
+    setQuickCompleteLoading(true);
+    
+    // First update the UI
+    setExercises(prev => {
+      const updated = {};
+      Object.keys(prev).forEach(category => {
+        updated[category] = prev[category].map(exercise => {
+          if (timeOfDay === 'AM') {
+            return { ...exercise, completedAM: false };
+          } else {
+            return { ...exercise, completedPM: false };
+          }
+        });
+      });
+      return updated;
+    });
+    
+    // Then update Firebase for all exercises
+    if (currentUser) {
+      const allExercises = getAllExercises();
+      
+      const promises = allExercises.map(exercise => {
+        // Skip locked exercises for free users
+        if (!canAccessExercise(exercise)) {
+          return Promise.resolve();
+        }
+        
+        return updateExerciseTracking(
+          currentUser.uid, 
+          exercise.id, 
+          {
+            completed: false,
+            repsPerformed: null, 
+            painLevel: null,
+            timeOfDay: timeOfDay
+          },
+          selectedDate
+        ).then(updatedPrescription => {
+          // Update the prescription in state
+          setPrescriptions(prev => ({
+            ...prev,
+            [exercise.id]: updatedPrescription
+          }));
+        }).catch(error => {
+          console.error(`Error undoing quick complete for ${exercise.id}:`, error);
+        });
+      });
+      
+      // Wait for all updates to complete
+      try {
+        await Promise.all(promises);
+      } catch (error) {
+        console.error("Error during undo quick complete:", error);
+      } finally {
+        setQuickCompleteLoading(false);
+      }
+    } else {
+      setQuickCompleteLoading(false);
     }
   }
 
@@ -845,6 +915,8 @@ export default function ExerciseProgram() {
                   targetRepMax: exercise.targetReps?.max || 20
                 };
                 
+                // Check if the exercise is completed for the current time of day
+                const isCompleted = isExerciseCompleted(exercise);
                 const hasAccess = canAccessExercise(exercise);
                 
                 return (
@@ -886,24 +958,31 @@ export default function ExerciseProgram() {
                       )}
                       
                       <div className="flex justify-between items-center">
-                        {/* Log button */}
+                        {/* Log/Undo button */}
                         <button 
                           className={`px-4 py-1.5 rounded-full text-white text-sm font-medium ${
-                            isExerciseCompleted(exercise) ? 'bg-gray-400' : 'bg-red-500 hover:bg-red-600'
+                            isCompleted ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (hasAccess && !isExerciseCompleted(exercise)) {
+                            if (hasAccess) {
                               toggleExerciseCompletion('stretches', exercise.id);
                             }
                           }}
-                          disabled={!hasAccess || isExerciseCompleted(exercise)}
+                          disabled={!hasAccess}
                         >
-                          LOG
+                          {isCompleted ? (
+                            <span className="flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                              </svg>
+                              UNDO
+                            </span>
+                          ) : 'LOG'}
                         </button>
                         
                         {/* Completion checkmark */}
-                        {isExerciseCompleted(exercise) && (
+                        {isCompleted && (
                           <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -944,6 +1023,8 @@ export default function ExerciseProgram() {
                   targetRepMax: exercise.targetReps?.max || 20
                 };
                 
+                // Check if the exercise is completed for the current time of day
+                const isCompleted = isExerciseCompleted(exercise);
                 const hasAccess = canAccessExercise(exercise);
                 
                 return (
@@ -986,24 +1067,31 @@ export default function ExerciseProgram() {
                       )}
                       
                       <div className="flex justify-between items-center">
-                        {/* Log button */}
+                        {/* Log/Undo button */}
                         <button 
                           className={`px-4 py-1.5 rounded-full text-white text-sm font-medium ${
-                            isExerciseCompleted(exercise) ? 'bg-gray-400' : 'bg-red-500 hover:bg-red-600'
+                            isCompleted ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (hasAccess && !isExerciseCompleted(exercise)) {
+                            if (hasAccess) {
                               toggleExerciseCompletion('isometrics', exercise.id);
                             }
                           }}
-                          disabled={!hasAccess || isExerciseCompleted(exercise)}
+                          disabled={!hasAccess}
                         >
-                          LOG
+                          {isCompleted ? (
+                            <span className="flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                              </svg>
+                              UNDO
+                            </span>
+                          ) : 'LOG'}
                         </button>
                         
                         {/* Completion checkmark */}
-                        {isExerciseCompleted(exercise) && (
+                        {isCompleted && (
                           <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -1044,6 +1132,8 @@ export default function ExerciseProgram() {
                   targetRepMax: exercise.targetReps?.max || 20
                 };
                 
+                // Check if the exercise is completed for the current time of day
+                const isCompleted = isExerciseCompleted(exercise);
                 const hasAccess = canAccessExercise(exercise);
                 
                 return (
@@ -1090,24 +1180,31 @@ export default function ExerciseProgram() {
                       )}
                       
                       <div className="flex justify-between items-center">
-                        {/* Log button */}
+                        {/* Log/Undo button */}
                         <button 
                           className={`px-4 py-1.5 rounded-full text-white text-sm font-medium ${
-                            isExerciseCompleted(exercise) ? 'bg-gray-400' : 'bg-red-500 hover:bg-red-600'
+                            isCompleted ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (hasAccess && !isExerciseCompleted(exercise)) {
+                            if (hasAccess) {
                               toggleExerciseCompletion('strength', exercise.id);
                             }
                           }}
-                          disabled={!hasAccess || isExerciseCompleted(exercise)}
+                          disabled={!hasAccess}
                         >
-                          LOG
+                          {isCompleted ? (
+                            <span className="flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                              </svg>
+                              UNDO
+                            </span>
+                          ) : 'LOG'}
                         </button>
                         
                         {/* Completion checkmark */}
-                        {isExerciseCompleted(exercise) && (
+                        {isCompleted && (
                           <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -1141,6 +1238,8 @@ export default function ExerciseProgram() {
             <h2 className="text-xl font-semibold mb-4">Neural Mobility Exercises</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {exercises.neural.map((exercise, index) => {
+                // Check if the exercise is completed for the current time of day
+                const isCompleted = isExerciseCompleted(exercise);
                 const hasAccess = canAccessExercise(exercise);
                 
                 return (
@@ -1182,24 +1281,31 @@ export default function ExerciseProgram() {
                       )}
                       
                       <div className="flex justify-between items-center">
-                        {/* Log button */}
+                        {/* Log/Undo button */}
                         <button 
                           className={`px-4 py-1.5 rounded-full text-white text-sm font-medium ${
-                            isExerciseCompleted(exercise) ? 'bg-gray-400' : 'bg-red-500 hover:bg-red-600'
+                            isCompleted ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (hasAccess && !isExerciseCompleted(exercise)) {
+                            if (hasAccess) {
                               toggleExerciseCompletion('neural', exercise.id);
                             }
                           }}
-                          disabled={!hasAccess || isExerciseCompleted(exercise)}
+                          disabled={!hasAccess}
                         >
-                          LOG
+                          {isCompleted ? (
+                            <span className="flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                              </svg>
+                              UNDO
+                            </span>
+                          ) : 'LOG'}
                         </button>
                         
                         {/* Completion checkmark */}
-                        {isExerciseCompleted(exercise) && (
+                        {isCompleted && (
                           <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -1239,17 +1345,59 @@ export default function ExerciseProgram() {
         </div>
       )}
 
-      {/* Quick Complete Button */}
-      <div className="mt-8 text-center">
-        <button 
-          className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
-          onClick={quickComplete}
-          disabled={dateLoading}
-        >
-          {dateLoading ? "Loading..." : "Quick Complete"}
-        </button>
-        <p className="text-sm text-gray-600 mt-2">Marks all exercises as complete for the {timeOfDay} session.</p>
-        <p className="text-sm text-gray-500 mt-1">Current date: {formatDate(selectedDate)}</p>
+      {/* Quick Complete and Undo All Buttons */}
+      <div className="mt-8 text-center space-y-4">
+        <div className="flex justify-center space-x-4">
+          <button 
+            className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:bg-red-300 flex items-center"
+            onClick={quickComplete}
+            disabled={dateLoading || quickCompleteLoading}
+          >
+            {quickCompleteLoading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Quick Complete
+              </>
+            )}
+          </button>
+          
+          <button 
+            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 flex items-center"
+            onClick={undoQuickComplete}
+            disabled={dateLoading || quickCompleteLoading}
+          >
+            {quickCompleteLoading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Undo All
+              </>
+            )}
+          </button>
+        </div>
+        
+        <p className="text-sm text-gray-600">
+          {dateLoading ? "Loading..." : `The ${timeOfDay} session on ${formatDate(selectedDate)}`}
+        </p>
       </div>
 
       {/* Exercise Detail Modal */}
