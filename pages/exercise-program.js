@@ -63,7 +63,15 @@ function getRecommendedExercises(selectedPainRegions, nerveTestResults, userHasP
   // Used to track unique exercises to avoid duplicates
   const exerciseSet = new Set();
   
-  // Process each pain region and add exercises
+  // First collect all exercises that apply to user's pain regions
+  const allExercises = {
+    stretches: [],
+    isometrics: [],
+    strength: [],
+    neural: []
+  };
+
+  // Get all possible exercises for the user's pain regions
   selectedPainRegions.forEach(regionId => {
     Object.values(exerciseLibrary).forEach(exercise => {
       // Skip if exercise is already in the set
@@ -71,24 +79,16 @@ function getRecommendedExercises(selectedPainRegions, nerveTestResults, userHasP
         return;
       }
       
-      // Skip if not pro user and exercise isn't free for this pain region
-      if (!userHasProAccess && !isExerciseFreeForUser(exercise.id, selectedPainRegions)) {
-        return;
-      }
-      
       // Check if exercise is for this pain region
-      if (
-        exercise.painRegions && 
-        exercise.painRegions.includes(regionId) &&
-        exercise.category !== 'neural' // Neural exercises handled separately
-      ) {
-        // Add exercise to appropriate category
-        if (result[exercise.category]) {
-          result[exercise.category].push({
+      if (exercise.painRegions && exercise.painRegions.includes(regionId) && exercise.category !== 'neural') {
+        // Add to appropriate category
+        if (allExercises[exercise.category]) {
+          allExercises[exercise.category].push({
             ...exercise,
             completedAM: false,
             completedPM: false,
-            painRegion: regionId
+            painRegion: regionId,
+            isFree: isExerciseFreeForUser(exercise.id, selectedPainRegions)
           });
           
           // Mark as added to avoid duplicates
@@ -100,8 +100,7 @@ function getRecommendedExercises(selectedPainRegions, nerveTestResults, userHasP
   
   // Add neural mobility exercises based on test results if available
   if (nerveTestResults) {
-    // Initialize neural array if it doesn't exist
-    result.neural = result.neural || [];
+    allExercises.neural = allExercises.neural || [];
     
     ['ulnar', 'radial', 'median'].forEach(nerveType => {
       const testResult = nerveTestResults[nerveType];
@@ -110,13 +109,12 @@ function getRecommendedExercises(selectedPainRegions, nerveTestResults, userHasP
       if (testResult && testResult !== 'none') {
         const exercise = getNeuralMobilityExercise(nerveType, testResult);
         
-        if (exercise && 
-            (userHasProAccess || isExerciseFreeForUser(exercise.id, selectedPainRegions)) && 
-            !exerciseSet.has(exercise.id)) {
-          result.neural.push({
+        if (exercise && !exerciseSet.has(exercise.id)) {
+          allExercises.neural.push({
             ...exercise,
             completedAM: false,
-            completedPM: false
+            completedPM: false,
+            isFree: isExerciseFreeForUser(exercise.id, selectedPainRegions)
           });
           
           exerciseSet.add(exercise.id);
@@ -125,29 +123,19 @@ function getRecommendedExercises(selectedPainRegions, nerveTestResults, userHasP
     });
   }
   
-  // Limit the number of exercises per category for a balanced program
-  return {
-    stretches: result.stretches.slice(0, 20),
-    isometrics: result.isometrics.slice(0, 20),
-    strength: result.strength.slice(0, 20),
-    neural: result.neural || []
-  };
-}
-
-// Replace canAccessExercise function
-function canAccessExercise(exercise) {
-  // Pro users can access all exercises
-  if (isProUser(userData)) {
-    return true;
-  }
+  // Now sort each category, putting free exercises first
+  Object.keys(allExercises).forEach(category => {
+    // Sort free exercises first
+    const sorted = [...allExercises[category]].sort((a, b) => {
+      if (a.isFree && !b.isFree) return -1;
+      if (!a.isFree && b.isFree) return 1;
+      return 0;
+    });
+    
+    result[category] = sorted;
+  });
   
-  // Get user's selected pain regions
-  const userPainRegions = userData?.painRegions ? 
-    Object.keys(userData.painRegions).filter(key => userData.painRegions[key]) : 
-    [];
-  
-  // For free users, check if the exercise is free for their pain regions
-  return isExerciseFreeForUser(exercise.id, userPainRegions);
+  return result;
 }
 
 export default function ExerciseProgram() {
@@ -165,7 +153,7 @@ export default function ExerciseProgram() {
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [allExercises, setAllExercises] = useState([]);
-  const [userData, setUserData] = useState(null); // Store the entire user data for pro status check
+  const [userData, setUserData] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
   
@@ -246,14 +234,14 @@ export default function ExerciseProgram() {
         
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          // Store the entire user data object for use with isProUser function
           setUserData(userData);
           
           // Get pain regions
           const painRegions = userData.painRegions || {};
           
           // Filter to get only the selected pain regions
-          const selectedPainRegions = Object.keys(painRegions).filter(region => painRegions[region] === true);
+          const selectedPainRegions = Object.keys(painRegions).filter(region => 
+            painRegions[region] === true);
           
           // Fetch nerve mobility test results
           const nerveTestResults = userData.nerveMobilityTest || {};
@@ -454,6 +442,17 @@ export default function ExerciseProgram() {
     return `${displayWeight} ${weightUnit}`;
   }
 
+  // Function to check if an exercise is accessible (free or pro user)
+  function canAccessExercise(exercise) {
+    // Pro users can access all exercises
+    if (isProUser(userData)) {
+      return true;
+    }
+    
+    // For free users, check if the exercise is marked as free
+    return exercise.isFree === true;
+  }
+
   // Function to mark or unmark an exercise as complete based on time of day
   async function toggleExerciseCompletion(category, id) {
     // Get the current completion state of the exercise
@@ -554,7 +553,7 @@ export default function ExerciseProgram() {
       
       const promises = allExercises.map(exercise => {
         // Skip locked exercises for free users
-        if (!isProUser(userData) && !exercise.isFree) {
+        if (!canAccessExercise(exercise)) {
           return Promise.resolve();
         }
         
@@ -683,11 +682,6 @@ export default function ExerciseProgram() {
   function closeExerciseDetail() {
     setSelectedExercise(null);
   }
-
-  // Function to check if an exercise is free based on subscription status
-  function canAccessExercise(exercise) {
-    return isProUser(userData) || exercise.isFree;
-  }
   
   // Function to handle tracking form submission
   async function handleTrackingSubmit(e) {
@@ -785,7 +779,7 @@ export default function ExerciseProgram() {
           className="flex items-center space-x-1 bg-gray-100 px-3 py-1 rounded-md text-sm"
         >
           <span>{weightUnit.toUpperCase()}</span>
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
           </svg>
         </button>
@@ -823,18 +817,18 @@ export default function ExerciseProgram() {
       </div>
 
       {/* Day/Night Toggle for AM/PM */}
-<div className="flex justify-center mb-8">
-  <div className="flex flex-col items-center">
-    <DayNightToggle 
-      isDay={timeOfDay === 'AM'} 
-      onChange={(isDay) => toggleTimeOfDay(isDay ? 'AM' : 'PM')}
-    />
-    
-    <p className="text-sm text-gray-600 mt-2">
-      {timeOfDay === 'AM' ? 'Morning' : 'Evening'} Session
-    </p>
-  </div>
-</div>
+      <div className="flex justify-center mb-8">
+        <div className="flex flex-col items-center">
+          <DayNightToggle 
+            isDay={timeOfDay === 'AM'} 
+            onChange={(isDay) => toggleTimeOfDay(isDay ? 'AM' : 'PM')}
+          />
+          
+          <p className="text-sm text-gray-600 mt-2">
+            {timeOfDay === 'AM' ? 'Morning' : 'Evening'} Session
+          </p>
+        </div>
+      </div>
 
       {/* Exercise Sections */}
       <div className="space-y-8">
@@ -851,15 +845,17 @@ export default function ExerciseProgram() {
                   targetRepMax: exercise.targetReps?.max || 20
                 };
                 
+                const hasAccess = canAccessExercise(exercise);
+                
                 return (
                   <div 
                     key={exercise.id}
                     className={`bg-white rounded-lg shadow overflow-hidden ${
-                      canAccessExercise(exercise) ? 'cursor-pointer' : 'cursor-not-allowed'
+                      hasAccess ? 'cursor-pointer' : 'cursor-not-allowed'
                     } relative`}
-                    onClick={() => canAccessExercise(exercise) && openExerciseDetail(exercise, 'stretches', index)}
+                    onClick={() => hasAccess && openExerciseDetail(exercise, 'stretches', index)}
                   >
-                    {/* Exercise Image - Using imageUrl directly */}
+                    {/* Exercise Image */}
                     <div className="h-48 w-full bg-gray-100">
                       <img 
                         src={exercise.imageUrl} 
@@ -897,11 +893,11 @@ export default function ExerciseProgram() {
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (!isExerciseCompleted(exercise)) {
+                            if (hasAccess && !isExerciseCompleted(exercise)) {
                               toggleExerciseCompletion('stretches', exercise.id);
                             }
                           }}
-                          disabled={!canAccessExercise(exercise) || isExerciseCompleted(exercise)}
+                          disabled={!hasAccess || isExerciseCompleted(exercise)}
                         >
                           LOG
                         </button>
@@ -918,7 +914,7 @@ export default function ExerciseProgram() {
                     </div>
 
                     {/* Pro overlay for locked exercises */}
-                    {!canAccessExercise(exercise) && (
+                    {!hasAccess && (
                       <div className="absolute inset-0 bg-gray-700 bg-opacity-75 flex flex-col items-center justify-center px-4 z-10">
                         <div className="bg-red-500 rounded-full p-2 mb-4">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -948,15 +944,17 @@ export default function ExerciseProgram() {
                   targetRepMax: exercise.targetReps?.max || 20
                 };
                 
+                const hasAccess = canAccessExercise(exercise);
+                
                 return (
                   <div 
                     key={exercise.id}
                     className={`bg-white rounded-lg shadow overflow-hidden ${
-                      canAccessExercise(exercise) ? 'cursor-pointer' : 'cursor-not-allowed'
+                      hasAccess ? 'cursor-pointer' : 'cursor-not-allowed'
                     } relative`}
-                    onClick={() => canAccessExercise(exercise) && openExerciseDetail(exercise, 'isometrics', index)}
+                    onClick={() => hasAccess && openExerciseDetail(exercise, 'isometrics', index)}
                   >
-                    {/* Exercise Image - Using imageUrl directly */}
+                    {/* Exercise Image */}
                     <div className="h-48 w-full bg-gray-100">
                       <img 
                         src={exercise.imageUrl} 
@@ -995,11 +993,11 @@ export default function ExerciseProgram() {
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (!isExerciseCompleted(exercise)) {
+                            if (hasAccess && !isExerciseCompleted(exercise)) {
                               toggleExerciseCompletion('isometrics', exercise.id);
                             }
                           }}
-                          disabled={!canAccessExercise(exercise) || isExerciseCompleted(exercise)}
+                          disabled={!hasAccess || isExerciseCompleted(exercise)}
                         >
                           LOG
                         </button>
@@ -1016,7 +1014,7 @@ export default function ExerciseProgram() {
                     </div>
 
                     {/* Pro overlay for locked exercises */}
-                    {!canAccessExercise(exercise) && (
+                    {!hasAccess && (
                       <div className="absolute inset-0 bg-gray-700 bg-opacity-75 flex flex-col items-center justify-center px-4 z-10">
                         <div className="bg-red-500 rounded-full p-2 mb-4">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1046,15 +1044,17 @@ export default function ExerciseProgram() {
                   targetRepMax: exercise.targetReps?.max || 20
                 };
                 
+                const hasAccess = canAccessExercise(exercise);
+                
                 return (
                   <div 
                     key={exercise.id}
                     className={`bg-white rounded-lg shadow overflow-hidden ${
-                      canAccessExercise(exercise) ? 'cursor-pointer' : 'cursor-not-allowed'
+                      hasAccess ? 'cursor-pointer' : 'cursor-not-allowed'
                     } relative`}
-                    onClick={() => canAccessExercise(exercise) && openExerciseDetail(exercise, 'strength', index)}
+                    onClick={() => hasAccess && openExerciseDetail(exercise, 'strength', index)}
                   >
-                    {/* Exercise Image - Using imageUrl directly */}
+                    {/* Exercise Image */}
                     <div className="h-48 w-full bg-gray-100">
                       <img 
                         src={exercise.imageUrl} 
@@ -1097,11 +1097,11 @@ export default function ExerciseProgram() {
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (!isExerciseCompleted(exercise)) {
+                            if (hasAccess && !isExerciseCompleted(exercise)) {
                               toggleExerciseCompletion('strength', exercise.id);
                             }
                           }}
-                          disabled={!canAccessExercise(exercise) || isExerciseCompleted(exercise)}
+                          disabled={!hasAccess || isExerciseCompleted(exercise)}
                         >
                           LOG
                         </button>
@@ -1118,7 +1118,7 @@ export default function ExerciseProgram() {
                     </div>
 
                     {/* Pro overlay for locked exercises */}
-                    {!canAccessExercise(exercise) && (
+                    {!hasAccess && (
                       <div className="absolute inset-0 bg-gray-700 bg-opacity-75 flex flex-col items-center justify-center px-4 z-10">
                         <div className="bg-red-500 rounded-full p-2 mb-4">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1141,15 +1141,17 @@ export default function ExerciseProgram() {
             <h2 className="text-xl font-semibold mb-4">Neural Mobility Exercises</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {exercises.neural.map((exercise, index) => {
+                const hasAccess = canAccessExercise(exercise);
+                
                 return (
                   <div 
                     key={exercise.id}
                     className={`bg-white rounded-lg shadow overflow-hidden ${
-                      canAccessExercise(exercise) ? 'cursor-pointer' : 'cursor-not-allowed'
+                      hasAccess ? 'cursor-pointer' : 'cursor-not-allowed'
                     } relative`}
-                    onClick={() => canAccessExercise(exercise) && openExerciseDetail(exercise, 'neural', index)}
+                    onClick={() => hasAccess && openExerciseDetail(exercise, 'neural', index)}
                   >
-                    {/* Exercise Image - Using imageUrl directly */}
+                    {/* Exercise Image */}
                     <div className="h-48 w-full bg-gray-100">
                       <img 
                         src={exercise.imageUrl} 
@@ -1187,11 +1189,11 @@ export default function ExerciseProgram() {
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (!isExerciseCompleted(exercise)) {
+                            if (hasAccess && !isExerciseCompleted(exercise)) {
                               toggleExerciseCompletion('neural', exercise.id);
                             }
                           }}
-                          disabled={!canAccessExercise(exercise) || isExerciseCompleted(exercise)}
+                          disabled={!hasAccess || isExerciseCompleted(exercise)}
                         >
                           LOG
                         </button>
@@ -1208,7 +1210,7 @@ export default function ExerciseProgram() {
                     </div>
 
                     {/* Pro overlay for locked exercises */}
-                    {!canAccessExercise(exercise) && (
+                    {!hasAccess && (
                       <div className="absolute inset-0 bg-gray-700 bg-opacity-75 flex flex-col items-center justify-center px-4 z-10">
                         <div className="bg-red-500 rounded-full p-2 mb-4">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1279,7 +1281,7 @@ export default function ExerciseProgram() {
                 </div>
               )}
               
-              {/* Exercise Video/Image - Using imageUrl directly */}
+              {/* Exercise Video/Image */}
               <div className="bg-gray-200 h-64 rounded-lg mb-4 flex items-center justify-center relative">
                 <img 
                   src={selectedExercise.imageUrl} 
